@@ -1,0 +1,6 @@
+node_modules
+.env
+
+# Runtime data (SQLite database & legacy JSON backup)
+src/data/
+*.log

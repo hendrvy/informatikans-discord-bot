@@ -1,0 +1,16 @@
+node_modules
+.env
+.env.example
+.git
+.gitignore
+npm-debug.log
+src/data/*.db
+src/data/*.db-*
+src/data/*.json
+src/data/*.json.migrated
+README.md
+*.md
+tests
+coverage
+**/*.test.js
+jest.config.js
