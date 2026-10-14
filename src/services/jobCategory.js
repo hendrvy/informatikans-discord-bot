@@ -1,79 +1,109 @@
+// Definisi kategori dipisah agar bisa dipakai untuk:
+// 1. Deteksi kategori sebuah lowongan (getJobCategory)
+// 2. Pilihan filter di slash command /cari (JOB_CATEGORIES)
+
+const JOB_CATEGORIES = [
+    {
+        name: "Frontend / Web",
+        emoji: "🌐",
+        keywords: [
+            "frontend", "front-end", "react", "web developer",
+            "web development", "vue", "angular", "next.js", "html", "css"
+        ]
+    },
+    {
+        name: "Backend",
+        emoji: "⚙️",
+        keywords: [
+            "backend", "back-end", "node.js", "nodejs", "java",
+            "golang", "php", "laravel", "spring", ".net", "api"
+        ]
+    },
+    {
+        name: "Mobile",
+        emoji: "📱",
+        keywords: [
+            "mobile", "android", "ios", "flutter", "react native"
+        ]
+    },
+    {
+        name: "Data / AI",
+        emoji: "📊",
+        keywords: [
+            "data analyst", "data analysis", "data science", "data engineer",
+            "machine learning", "artificial intelligence", "ai", "big data"
+        ]
+    },
+    {
+        name: "Cyber Security",
+        emoji: "🔐",
+        keywords: [
+            "cyber", "security", "information security", "it security",
+            "penetration testing", "pentest"
+        ]
+    },
+    {
+        name: "UI/UX Design",
+        emoji: "🎨",
+        keywords: [
+            "ui/ux", "ui ux", "user interface", "user experience",
+            "ux designer", "ui designer", "product designer", "figma"
+        ]
+    },
+    {
+        name: "DevOps / Cloud",
+        emoji: "☁️",
+        keywords: [
+            "devops", "cloud", "aws", "azure", "google cloud",
+            "infrastructure", "kubernetes", "docker"
+        ]
+    },
+    {
+        name: "IT Support",
+        emoji: "💻",
+        keywords: [
+            "it support", "helpdesk", "technical support",
+            "system administrator", "it asset", "it operations"
+        ]
+    },
+    {
+        name: "QA / Testing",
+        emoji: "🧪",
+        keywords: [
+            "quality assurance", "qa", "software testing", "tester"
+        ]
+    },
+    {
+        name: "Product / PM",
+        emoji: "📋",
+        keywords: [
+            "product manager", "product owner", "project manager",
+            "product design", "scrum"
+        ]
+    }
+];
+
 function getJobCategory(job) {
     const text = `
         ${job.title || ""}
         ${job.snippet || ""}
     `.toLowerCase();
 
-    if (
-        text.includes("frontend") ||
-        text.includes("front-end") ||
-        text.includes("react") ||
-        text.includes("web developer")
-    ) {
-        return "🌐 Frontend / Web Development";
-    }
+    for (const category of JOB_CATEGORIES) {
 
-    if (
-        text.includes("backend") ||
-        text.includes("back-end") ||
-        text.includes("node.js") ||
-        text.includes("java")
-    ) {
-        return "⚙️ Backend Development";
-    }
+        const matched = category.keywords.some(
+            keyword => text.includes(keyword)
+        );
 
-    if (
-    text.includes("it asset") ||
-    text.includes("it support") ||
-    text.includes("helpdesk") ||
-    text.includes("technical support") ||
-    text.includes("system administrator") ||
-    text.includes("infrastructure")
-    ) {
-        return "💻 IT / Infrastructure";
-    }
-
-    if (
-        text.includes("data") ||
-        text.includes("machine learning") ||
-        text.includes("artificial intelligence")
-    ) {
-        return "📊 Data / AI";
-    }
-
-    if (
-        text.includes("cyber") ||
-        text.includes("security")
-    ) {
-        return "🔐 Cyber Security";
-    }
-
-    if (
-        text.includes("ui/ux") ||
-        text.includes("ui ux") ||
-        text.includes("user interface")
-    ) {
-        return "🎨 UI/UX Design";
-    }
-
-    if (
-        text.includes("devops") ||
-        text.includes("cloud")
-    ) {
-        return "☁️ DevOps / Cloud";
-    }
-
-    if (
-        text.includes("mobile") ||
-        text.includes("android") ||
-        text.includes("ios")
-    ) {
-        return "📱 Mobile Development";
+        if (matched) {
+            return `${category.emoji} ${category.name}`;
+        }
     }
 
     return "💻 Information Technology";
 }
 
 module.exports = {
+    JOB_CATEGORIES,
     getJobCategory
 };

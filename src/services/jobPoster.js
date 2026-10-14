@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 
 const {
     isAlreadyPosted,
@@ -157,6 +157,11 @@ function createJobEmbed(job) {
             job.snippet
         );
 
+    const summary =
+        cleanText(
+            job.summary || ""
+        );
+
     const embed =
         new EmbedBuilder()
 
@@ -168,7 +173,10 @@ function createJobEmbed(job) {
                 `### 💼 ${
                     job.position ||
                     job.title
-                }`
+                }` +
+                (summary
+                    ? `\n\n${summary.substring(0, 300)}${summary.length > 300 ? "..." : ""}`
+                    : "")
             )
 
             .addFields(
@@ -222,36 +230,77 @@ function createJobEmbed(job) {
                 },
 
                 {
-                    name: "📡 Sumber",
+                    name: "⏳ Durasi",
                     value:
-                        formatSource(job),
+                        job.duration ||
+                        "Tidak disebutkan",
                     inline: true
                 },
 
                 {
-                    name: "🔗 Pendaftaran",
+                    name: "📡 Sumber",
                     value:
-                        job.link
-                            ? `[Klik di sini untuk melamar 🚀](${job.link})`
-                            : "Link tidak tersedia"
+                        formatSource(job),
+                    inline: true
                 }
 
             )
 
             .setFooter({
                 text:
-                    "Internship Alert • HMIF"
+                    "Internship Alert • HMIF • ⚠️ Verifikasi keaslian lowongan sebelum melamar. Kami tidak bertanggung jawab atas penipuan."
             })
 
             .setTimestamp();
+
+    // Link pendaftaran jadi tombol di bawah embed (lihat
+    // buildJobComponents). Kalau tidak ada link, tampilkan
+    // sebagai field biasa.
+
+    if (!job.link) {
+
+        embed.addFields({
+            name: "🔗 Pendaftaran",
+            value: "Link tidak tersedia"
+        });
+    }
 
     return embed;
 }
 
 
 // ==============================
+// TOMBOL LINK
+// ==============================
+
+function buildJobComponents(job) {
+
+    if (!job.link) {
+        return [];
+    }
+
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(" Lamar Sekarang")
+                .setStyle(ButtonStyle.Link)
+                .setURL(job.link)
+        )
+    ];
+}
+
+
+// ==============================
 // POST JOB
 // ==============================
+
+// Jeda antar posting agar tidak membanjiri channel kalau
+// ada banyak lowongan baru sekaligus.
+
+const POST_DELAY_MS = 3000;
+
+const sleep = ms =>
+    new Promise(resolve => setTimeout(resolve, ms));
 
 async function postJob(channel, job) {
 
@@ -267,8 +316,12 @@ async function postJob(channel, job) {
     const embed =
         createJobEmbed(job);
 
+    const components =
+        buildJobComponents(job);
+
     await channel.send({
-        embeds: [embed]
+        embeds: [embed],
+        components
     });
 
     savePostedJob(job);
@@ -276,6 +329,10 @@ async function postJob(channel, job) {
     console.log(
         `📤 Berhasil dikirim: ${job.title}`
     );
+
+    // Jeda sebelum posting berikutnya (anti-spam)
+
+    await sleep(POST_DELAY_MS);
 
     return true;
 }
@@ -287,5 +344,6 @@ async function postJob(channel, job) {
 
 module.exports = {
     postJob,
-    createJobEmbed
+    createJobEmbed,
+    buildJobComponents
 };

@@ -1,6 +1,6 @@
 const config = require("../config");
 
-const { getJobs } = require("./jobCollector");
+const { getJobs, isTotalFailure, failureCounts } = require("./jobCollector");
 const { postJob } = require("./jobPoster");
 const { isRelevantInternship } = require("./jobFilter");
 const { getJobDetails } = require("./jobDetailCollector");
@@ -8,6 +8,71 @@ const { isAlreadyPosted } = require("./duplicateChecker");
 
 
 let isCheckingInternships = false;
+
+
+// ==============================
+// ALERT SCRAPER RUSAK
+// ==============================
+
+// Pesan alert hanya dikirim sekali per episode kegagalan
+// (tidak berulang tiap siklus selama kondisi sama).
+
+let hasSentFailureAlert = false;
+
+async function maybeSendScraperAlert(channel) {
+
+    const brokenSources = Object.entries(failureCounts)
+        .filter(([, count]) => count > 0)
+        .map(([name, count]) => `- ${name}: gagal ${count}x berturut-turut`);
+
+    const totalFailure = isTotalFailure(failureCounts);
+
+    // Kirim alert saat minimal satu sumber mencapai ambang,
+    // atau saat total kegagalan (semua rusak sekaligus).
+
+    const shouldAlert =
+        (brokenSources.length > 0 && totalFailure) ||
+        Object.values(failureCounts)
+            .some(count => count >= 3);
+
+    if (!shouldAlert) {
+
+        // Kondisi membaik: reset agar alert berikutnya bisa terkirim
+
+        if (hasSentFailureAlert) {
+            console.log("✅ Scraper pulih, alert direset.");
+        }
+
+        hasSentFailureAlert = false;
+        return;
+    }
+
+    if (hasSentFailureAlert) {
+        return;
+    }
+
+    hasSentFailureAlert = true;
+
+    const message =
+        "🚨 **ALERT: Scraper lowongan bermasalah!**\n" +
+        "Beberapa sumber gagal diambil berulang kali:\n" +
+        brokenSources.join("\n") +
+        "\n\nSilakan cek console bot. Kemungkinan website sumber berubah struktur atau koneksi bermasalah.";
+
+    try {
+
+        await channel.send(message);
+
+        console.error("🚨 Alert scraper dikirim ke channel.");
+
+    } catch (error) {
+
+        console.error(
+            "Gagal mengirim alert scraper:",
+            error.message
+        );
+    }
+}
 
 
 // ==============================
@@ -42,6 +107,8 @@ async function checkInternships(client) {
         const jobs = await getJobs();
 
         console.log(`Total lowongan ditemukan: ${jobs.length}`);
+
+        await maybeSendScraperAlert(channel);
 
         for (const job of jobs) {
 
