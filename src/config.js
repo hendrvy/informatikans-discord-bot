@@ -71,7 +71,18 @@ const config = {
 
     // Event reminder
     eventAnnounceChannelId:
-        process.env.EVENT_ANNOUNCE_CHANNEL_ID || process.env.CHANNEL_ID
+        process.env.EVENT_ANNOUNCE_CHANNEL_ID || process.env.CHANNEL_ID,
+
+    // Monitoring: user Discord yang menerima DM alert kritikal
+    // (scraper rusak, alert channel gagal). Kosongkan untuk menonaktifkan.
+    adminUserId: process.env.ADMIN_USER_ID || null,
+
+    // Auto-deploy webhook (opsional). Kosongkan WEBHOOK_SECRET untuk
+    // melewati verifikasi signature.
+    webhookPort: process.env.WEBHOOK_PORT || 9000,
+    webhookPath: process.env.WEBHOOK_PATH || "/webhook",
+    webhookSecret: process.env.WEBHOOK_SECRET || null,
+    webhookBranch: process.env.WEBHOOK_BRANCH || "main"
 
 };
 

@@ -19,7 +19,7 @@ let isCheckingInternships = false;
 
 let hasSentFailureAlert = false;
 
-async function maybeSendScraperAlert(channel) {
+async function maybeSendScraperAlert(channel, client = null) {
 
     const brokenSources = Object.entries(failureCounts)
         .filter(([, count]) => count > 0)
@@ -68,7 +68,42 @@ async function maybeSendScraperAlert(channel) {
     } catch (error) {
 
         console.error(
-            "Gagal mengirim alert scraper:",
+            "Gagal mengirim alert scraper ke channel:",
+            error.message
+        );
+
+        await sendAdminAlert(client, message);
+    }
+}
+
+
+// ==============================
+// DM ALERT KE ADMIN (FALLBACK)
+// ==============================
+// Fallback terakhir kalau channel alert gagal dikirim: DM langsung ke
+// admin (ADMIN_USER_ID). Supaya kegagalan scraper tidak luput perhatian
+// walaupun bot tidak bisa akses channel-nya.
+
+async function sendAdminAlert(client, message) {
+
+    if (!config.adminUserId || !client) {
+        return;
+    }
+
+    try {
+
+        const user = await client.users.fetch(config.adminUserId);
+
+        await user.send(
+            "⚠️ (Bot tidak bisa mengirim alert ke channel)\n" + message
+        );
+
+        console.error("🚨 Alert scraper dikirim via DM ke admin.");
+
+    } catch (error) {
+
+        console.error(
+            "Gagal mengirim DM alert ke admin:",
             error.message
         );
     }
@@ -108,7 +143,7 @@ async function checkInternships(client) {
 
         console.log(`Total lowongan ditemukan: ${jobs.length}`);
 
-        await maybeSendScraperAlert(channel);
+        await maybeSendScraperAlert(channel, client);
 
         for (const job of jobs) {
 

@@ -2,6 +2,7 @@ const { Events } = require("discord.js");
 
 const config = require("../config");
 const { scheduleEventReminders } = require("../services/eventReminder");
+const { getEventReminderRole } = require("../services/store");
 
 
 const name = Events.GuildScheduledEventCreate;
@@ -24,10 +25,11 @@ async function execute(event, client) {
         return;
     }
 
-    // Role target diambil dari metadata yang disimpan saat /create_event dipanggil.
-    // Kalau event dibuat manual lewat UI Discord (bukan via /create_event), metadata
-    // ini tidak ada -> fallback ke @everyone (lihat services/eventReminder.js).
-    const roleId = client.eventReminderRoles?.get(event.id) ?? null;
+    // Role target diambil dari SQLite (disimpan saat /create_event dipanggil,
+    // persisten antar restart). Kalau event dibuat manual lewat UI Discord
+    // (bukan via /create_event), datanya tidak ada -> fallback ke @everyone
+    // (lihat services/eventReminder.js).
+    const roleId = getEventReminderRole(event.id);
 
     const role = roleId
         ? await event.guild.roles.fetch(roleId).catch(() => null)

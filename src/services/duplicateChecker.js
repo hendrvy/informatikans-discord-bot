@@ -1,6 +1,6 @@
 const path = require("path");
 const fs = require("fs");
-const Database = require("better-sqlite3");
+const { openSqliteDatabase } = require("../utils/sqlite");
 
 const DATA_DIR = path.join(__dirname, "../data");
 const DB_PATH =
@@ -10,13 +10,17 @@ const LEGACY_JSON_PATH = path.join(DATA_DIR, "postedJobs.json");
 
 const MAX_AGE_DAYS = 90;
 
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+// Query penyelamatan: riwayat lowongan lama dibaca sebisanya saat
+// file korup, lalu dimasukkan kembali ke database baru.
 
-const db = new Database(DB_PATH);
+const SALVAGE_QUERIES = [
+    "SELECT link, title, posted_at FROM posted_jobs"
+];
 
-db.pragma("journal_mode = WAL");
+const { db, salvaged, recovered } = openSqliteDatabase(
+    DB_PATH,
+    SALVAGE_QUERIES
+);
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS posted_jobs (
@@ -31,6 +35,44 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_posted_jobs_link
     ON posted_jobs(link)
 `);
+
+// Kembalikan riwayat lowongan yang berhasil diselamatkan.
+
+if (recovered && salvaged[0]?.length > 0) {
+
+    try {
+
+        const insert = db.prepare(`
+            INSERT OR IGNORE INTO posted_jobs (link, title, posted_at)
+            VALUES (?, ?, ?)
+        `);
+
+        const restore = db.transaction((rows) => {
+
+            for (const row of rows) {
+
+                if (!row.link) {
+                    continue;
+                }
+
+                insert.run(row.link, row.title ?? null, row.posted_at);
+            }
+        });
+
+        restore(salvaged[0]);
+
+        console.log(
+            `♻️ ${salvaged[0].length} riwayat lowongan berhasil diselamatkan dari database korup.`
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Gagal memulihkan riwayat lowongan:",
+            error.message
+        );
+    }
+}
 
 
 // =====================================

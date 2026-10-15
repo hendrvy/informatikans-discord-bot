@@ -7,6 +7,7 @@ const {
 } = require("discord.js");
 
 const { parseJakartaDateTime } = require("../utils/time");
+const { setEventReminderRole } = require("../services/store");
 
 
 const data = new SlashCommandBuilder()
@@ -115,9 +116,9 @@ async function execute(interaction) {
             reason: `Dibuat oleh ${interaction.user.tag} via /create_event`
         });
 
-        // Simpan role target reminder di metadata internal (lihat events/guildScheduledEventCreate.js)
-        interaction.client.eventReminderRoles ??= new Map();
-        interaction.client.eventReminderRoles.set(event.id, role?.id ?? null);
+        // Simpan role target reminder di SQLite (persisten antar restart,
+        // dibaca lagi oleh events/guildScheduledEventCreate.js).
+        setEventReminderRole(event.id, role?.id ?? null);
 
         await interaction.reply(
             `✅ Event berhasil dibuat! [Klik untuk lihat](${event.url})`

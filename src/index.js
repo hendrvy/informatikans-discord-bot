@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Collection } = require("discord.js");
 
 const config = require("./config");
 const { loadSlashCommands, loadLegacyCommands } = require("./utils/loadCommands");
+const { startAutoDeploy } = require("./autodeploy/listener");
 
 
 // ==============================
@@ -20,10 +21,6 @@ const client = new Client({
 
 client.slashCommands = loadSlashCommands();
 client.legacyCommands = loadLegacyCommands();
-
-// Menyimpan role target reminder per scheduled event ID (lihat
-// commands/createEvent.js & events/guildScheduledEventCreate.js)
-client.eventReminderRoles = new Map();
 
 
 // ==============================
@@ -61,6 +58,16 @@ for (const file of eventFiles) {
         client.on(event.name, (...args) => event.execute(...args, client));
 
     }
+}
+
+
+// ==============================
+// AUTO-DEPLOY WEBHOOK (opsional)
+// ==============================
+// Bisa dimatikan dengan set WEBHOOK_ENABLED=false di .env.
+
+if (process.env.WEBHOOK_ENABLED !== "false") {
+    startAutoDeploy();
 }
 
 

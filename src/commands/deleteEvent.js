@@ -3,6 +3,8 @@ const {
     PermissionFlagsBits
 } = require("discord.js");
 
+const { deleteEventReminderRole } = require("../services/store");
+
 
 const data = new SlashCommandBuilder()
     .setName("delete_event")
@@ -38,7 +40,7 @@ async function execute(interaction) {
 
         await event.delete();
 
-        interaction.client.eventReminderRoles?.delete(eventId);
+        deleteEventReminderRole(eventId);
 
         await interaction.editReply(
             `✅ Event '${eventName}' berhasil dihapus.`

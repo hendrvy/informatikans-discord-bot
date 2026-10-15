@@ -6,15 +6,34 @@ Bot Discord komunitas Informatikans. Awalnya ada dua bot terpisah (bot utilitas/
 
 ### 🔍 Lowongan Magang IT (tidak berubah dari sebelumnya)
 
-- Mengambil lowongan dari **Jooble API** dan scraping **DevJobsIndo**.
+- Mengambil lowongan dari **Jooble API**, scraping **DevJobsIndo**, dan scraping **Kalibrr**.
 - Mengambil detail lowongan (perusahaan, lokasi, deadline, requirements) untuk sumber yang mendukung.
 - Filter relevansi berdasarkan kata kunci magang & bidang teknologi.
 - Deduplikasi — lowongan yang sudah pernah diposting tidak akan diposting ulang.
 - Penjadwalan otomatis setiap 6 jam (timezone Asia/Jakarta) menggunakan `node-cron`.
 - Slash command `/testjob` untuk melihat preview format embed lowongan (khusus admin).
+- Slash command `/cari` untuk mencari lowongan on-demand dengan filter kata kunci, kategori, lokasi, dan sumber.
+
+### 🚀 Auto-Deploy Webhook (opsional)
+
+Bot punya webhook listener bawaan (`src/autodeploy/listener.js`) — push ke `main` akan otomatis `git pull` + `npm install --omit=dev` lalu `process.exit(0)` supaya panel (Pterodactyl/dll.) me-restart bot dengan kode baru. Tidak butuh pm2.
+
+Setup:
+
+1. Pastikan port `WEBHOOK_PORT` (default `9000`) ter-expose/ter-forward dari container ke interface publik VPS.
+2. GitHub → **Settings → Webhooks → Add webhook**:
+   - Payload URL: `http://<ip-vps>:9000/webhook`
+   - Content type: **application/json**
+   - Secret: isi string acak, lalu samakan dengan env `WEBHOOK_SECRET` di server
+   - Events: **Just the push event**
+3. Env terkait (lihat `.env.example`): `WEBHOOK_PORT`, `WEBHOOK_PATH`, `WEBHOOK_BRANCH`, `WEBHOOK_SECRET`, `WEBHOOK_ENABLED=false` untuk mematikan fitur ini.
+4. `git pull` harus bisa jalan non-interaktif (repo public, atau token di remote URL working copy server).
+
+Catatan keamanan: tanpa `WEBHOOK_SECRET`, siapa pun yang bisa menjangkau port bisa memicu deploy — isi secret sesegera mungkin. Kalau `git pull`/`npm install` gagal, bot lama tetap jalan (tidak exit) sampai push berikutnya berhasil.
 
 ### 🛠️ Utility
 
+- `/help` — menu panduan interaktif: ringkasan semua kategori fitur + select menu untuk melihat detail command per kategori.
 - `/ping` dan `$ping` — cek latency bot.
 
 ### 👋 Autorole & Role Angkatan
@@ -37,7 +56,22 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
 - `/create_event` — membuat scheduled event Discord (voice/stage channel), dengan opsi nama, deskripsi, gambar cover (URL), waktu mulai/selesai (format `DD-MM-YYYY HH:MM`, WIB), dan role yang akan di-ping saat reminder.
 - `/delete_event` — menghapus scheduled event berdasarkan ID.
 - Reminder otomatis dikirim ke channel `EVENT_ANNOUNCE_CHANNEL_ID` pada H-7, H-5, H-3, H-1, 12 jam, 6 jam, 3 jam, 1 jam, 30 menit, 15 menit, 5 menit, dan saat event dimulai.
-- Jika event dibuat manual lewat UI Discord (bukan via `/create_event`), atau role tidak diset, reminder akan fallback ping **@everyone** (bug ini ada di versi Python sebelumnya — di versi ini sudah diperbaiki).
+- Jika event dibuat manual lewat UI Discord (bukan via `/create_event`), atau role tidak diset, reminder akan fallback ping **@everyone**.
+- Mapping role target reminder kini **disimpan di SQLite**, jadi tidak hilang lagi saat bot restart.
+
+### ⏰ Utilitas Komunitas
+
+- `/remindme <waktu> <pesan>` — pengingat pribadi, contoh: `/remindme waktu:10m pesan:rapat DMIF`. Format waktu: `10m` (menit), `2h` (jam), `1d` (hari), atau gabungan `1d 12h`. Maksimal 90 hari. Reminder tersimpan di SQLite sehingga tetap terkirim walaupun bot restart. Jika channel asal sudah terhapus, pengingat dikirim via DM.
+- `/poll <pertanyaan> [opsi] [durasi_jam] [multi_jawaban]` — polling native Discord. Tanpa opsi → polling Ya/Tidak. Opsi dipisah koma (maks 10). Durasi 1–32 jam (default 24).
+- `/giveaway start <hadiah> <durasi>` (khusus **Manage Server**) — mulai giveaway; peserta ikut dengan react 🎉, pemenang diundi otomatis saat waktu habis. `/giveaway list` untuk melihat yang masih berjalan.
+- `/rolepanel <judul> <role_1..role_10>` (khusus **Manage Roles**) — membuat panel self-role dengan select menu. Member bisa ambil role dengan memilih, dan lepas role dengan menghapus pilihan.
+
+### 🎮 Fun & Games
+
+- `/trivia [kategori]` — kuis pilihan ganda (sumber: Open Trivia DB). Jawab lewat tombol dalam 20 detik; jawaban benar dapat 1 poin. Ada kategori umum, film, musik, games, matematika, computer science, sejarah, olahraga.
+- `/leaderboard [user]` — papan peringkat poin trivia server (atau cek poin user tertentu).
+- `/rps <lawan>` — suit batu-kertas-gunting head-to-head via tombol, pilihan tersembunyi, giliran 60 detik.
+- `/8ball <pertanyaan>` — tanya apa saja ke magic 8-ball.
 
 ## Prasyarat
 
@@ -75,6 +109,7 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
    | `AUTOROLE_CHANNEL_IDS` | ID channel yang dipantau untuk deteksi perkenalan (pisahkan koma jika lebih dari satu). |
    | `AUTOROLE_ROLE_NAME` | Nama role utama yang diberikan setelah perkenalan, default `Informatikans`. |
    | `EVENT_ANNOUNCE_CHANNEL_ID` | Channel untuk announce event & reminder (default: sama dengan `CHANNEL_ID`). |
+   | `ADMIN_USER_ID` | (Opsional) User ID Discord yang menerima DM alert kritikal (scraper rusak). |
 
    > **Jangan pernah commit file `.env`.** File ini sudah masuk `.gitignore`.
 
@@ -96,23 +131,37 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
 src/
 ├── index.js                          # Entry point: setup client, load commands/events, login
 ├── config.js                         # Baca & validasi semua env var di satu tempat
+├── autodeploy/
+│   └── listener.js                   # 🚀 Webhook GitHub → git pull → npm install → restart
 ├── commands/                         # Slash command ("/")
 │   ├── ping.js
+│   ├── help.js                       # Menu panduan interaktif semua fitur
 │   ├── testjob.js
+│   ├── cari.js                       # Cari lowongan on-demand dengan filter
 │   ├── createEvent.js
-│   └── deleteEvent.js
+│   ├── deleteEvent.js
+│   ├── remindme.js                   # Pengingat pribadi (/remindme)
+│   ├── poll.js                       # Polling native Discord
+│   ├── giveaway.js                   # Giveaway (start/list)
+│   ├── rolepanel.js                  # Panel self-role (select menu)
+│   ├── trivia.js                     # Kuis trivia (Open Trivia DB)
+│   ├── leaderboard.js                # Papan peringkat poin trivia
+│   ├── rps.js                        # Suit batu-kertas-gunting
+│   └── 8ball.js                      # Magic 8-ball
 ├── legacyCommands/                   # Prefix command ("$")
 │   ├── ping.js
 │   ├── say.js
 │   └── sayto.js
 ├── events/                           # Discord client event handler
-│   ├── ready.js                      # Registrasi command, presence, start cron scraping
-│   ├── interactionCreate.js          # Router slash command
+│   ├── ready.js                      # Registrasi command, presence, start cron scraping + scheduler komunitas
+│   ├── interactionCreate.js          # Router slash command + tombol/select menu (rolepanel, rps, trivia)
 │   ├── messageCreate.js              # Router prefix command + autorole + role angkatan
 │   └── guildScheduledEventCreate.js  # Trigger penjadwalan reminder event
 ├── services/
 │   ├── internshipChecker.js          # Logic pengecekan & posting lowongan (dipanggil dari ready.js & cron)
 │   ├── eventReminder.js              # Hitung & kirim reminder scheduled event
+│   ├── communityScheduler.js         # Tick 30 detik: kirim /remindme & undi giveaway
+│   ├── store.js                      # SQLite semua fitur komunitas (reminder, giveaway, poin trivia, role reminder)
 │   ├── jobCollector.js               # Menggabungkan lowongan dari semua sumber
 │   ├── jobFilter.js                  # Filter relevansi (magang + bidang IT)
 │   ├── jobDetailCollector.js         # Scraping detail lowongan (DevJobsIndo)
@@ -121,14 +170,15 @@ src/
 │   └── duplicateChecker.js           # Pengecekan & penyimpanan lowongan yang sudah diposting (SQLite)
 ├── sources/
 │   ├── jooble.js                     # Integrasi Jooble API
-│   └── devjobsindo.js                # Scraping DevJobsIndo
+│   ├── devjobsindo.js                # Scraping DevJobsIndo
+│   └── kalibrr.js                    # Scraping Kalibrr
 ├── utils/
 │   ├── loadCommands.js               # Dynamic loader untuk commands/ & legacyCommands/
 │   ├── parseAngkatan.js              # Parsing tahun angkatan dari pesan perkenalan
 │   ├── time.js                       # Helper parse/format waktu Asia/Jakarta
 │   └── retry.js                      # Helper retry + exponential backoff untuk request HTTP
 └── data/
-    └── postedJobs.db                 # Database SQLite riwayat lowongan yang sudah diposting
+    └── postedJobs.db                 # Database SQLite (dedup lowongan + semua data fitur komunitas)
 ```
 
 ## Catatan Keamanan
@@ -139,9 +189,19 @@ src/
 
 ## Keterbatasan yang Diketahui
 
-- Scraping DevJobsIndo cukup bergantung pada struktur HTML situs tersebut; jika situs berubah, scraping bisa gagal diam-diam (sudah ada retry, tapi tidak ada alerting otomatis).
-- Belum ada monitoring/alerting kalau salah satu sumber lowongan terus-menerus gagal.
-- Mapping role target reminder (`/create_event` → role tertentu) disimpan in-memory (`client.eventReminderRoles`), jadi akan hilang jika bot restart sebelum event dimulai. Reminder tetap jalan tapi fallback ke `@everyone`.
+- Scraping DevJobsIndo & Kalibrr bergantung pada struktur HTML situs tersebut; jika situs berubah, scraping bisa gagal. Sudah ada retry + alert otomatis ke channel (dan fallback DM ke `ADMIN_USER_ID` jika diisi).
+- Game RPS menyimpan state in-memory; game yang sedang berjalan akan hang jika bot restart di tengah permainan (pemain perlu memulai ulang).
+- Soal trivia berbahasa Inggris (dari Open Trivia DB); belum ada terjemahan otomatis.
+
+## Pemulihan Database Otomatis
+
+Jika file SQLite (`src/data/postedJobs.db`) korup — misalnya karena server mati mendadak atau disk penuh — bot **tidak akan crash-loop**. Saat startup, `src/utils/sqlite.js` otomatis:
+
+1. Menyelamatkan baris yang masih bisa dibaca (riwayat lowongan, reminder aktif, giveaway aktif, poin trivia, mapping role reminder).
+2. Mengarsipkan file korup sebagai `postedJobs.db.corrupt-<timestamp>` (beserta `-wal`/`-shm`), tidak dihapus.
+3. Membuat database baru dan memulihkan data yang terselamatkan.
+
+Log kejadiannya ditandai dengan `🚨 Database SQLite korup terdeteksi` dan `♻️ ... berhasil diselamatkan`.
 
 ## Menjalankan Test
 
@@ -149,7 +209,7 @@ src/
 npm test
 ```
 
-Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
+Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store fitur komunitas (`store.js`), parsing durasi/opsi/logika game (`communityCommands.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
 
 ## Deployment dengan Docker
 

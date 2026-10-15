@@ -1,7 +1,7 @@
 {
   "name": "internship-discord-bot",
-  "version": "2.0.0",
-  "description": "Discord bot komunitas Informatikans: posting lowongan magang IT otomatis (Jooble + DevJobsIndo), ping, say/sayto, autorole + role angkatan, dan scheduled event reminder.",
+  "version": "2.1.0",
+  "description": "Discord bot komunitas Informatikans: posting lowongan magang IT otomatis (Jooble + DevJobsIndo + Kalibrr), ping, say/sayto, autorole + role angkatan, scheduled event reminder, remindme, poll, giveaway, role panel, dan games (trivia, rps, 8ball).",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -15,7 +15,10 @@
     "magang",
     "job-scraper",
     "autorole",
-    "scheduled-event"
+    "scheduled-event",
+    "giveaway",
+    "trivia",
+    "community"
   ],
   "author": "",
   "license": "ISC",
