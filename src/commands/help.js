@@ -20,10 +20,7 @@ const CATEGORIES = {
         title: "Umum & Utilitas",
         description: [
             "`/help` — tampilkan menu bantuan ini.",
-            "`/ping` — cek latency bot.",
-            "`/remindme waktu:<10m|2h|1d> pesan:<teks>` — pengingat pribadi (contoh: `10m`, `1d 12h`).",
-            "`/poll pertanyaan:<teks> [opsi:<a, b, c>] [durasi_jam:1-32] [multi_jawaban]` — polling (tanpa opsi = Ya/Tidak).",
-            "`/rolepanel judul:<teks> role_1..role_10` — panel ambil role sendiri (admin)."
+            "`/ping` — cek latency bot."
         ].join("\n")
     },
 
@@ -46,20 +43,7 @@ const CATEGORIES = {
             "`/create_event name desc channel start_time end_time [role] [image]` — buat event (format waktu `DD-MM-YYYY HH:MM` WIB).",
             "`/delete_event event_id:<id>` — hapus event.",
             "",
-            "Reminder otomatis dikirim di H-7, H-5, H-3, H-1, 12 jam, 6 jam, 3 jam, 1 jam, 30 menit, 15 menit, 5 menit, dan saat event mulai.",
-            "`/giveaway start hadiah:<teks> durasi:<30m|2h|1d>` — mulai giveaway (react 🎉 untuk ikut).",
-            "`/giveaway list` — lihat giveaway yang berjalan."
-        ].join("\n")
-    },
-
-    games: {
-        emoji: "🎮",
-        title: "Fun & Games",
-        description: [
-            "`/trivia [kategori]` — kuis 20 detik, jawab benar = +1 poin.",
-            "`/leaderboard [user]` — papan peringkat poin trivia.",
-            "`/rps lawan:<@user>` — suit batu-kertas-gunting.",
-            "`/8ball pertanyaan:<teks>` — tanya ke magic 8-ball 🔮."
+            "Reminder otomatis dikirim di H-7, H-5, H-3, H-1, 12 jam, 6 jam, 3 jam, 1 jam, 30 menit, 15 menit, 5 menit, dan saat event mulai."
         ].join("\n")
     },
 

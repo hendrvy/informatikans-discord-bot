@@ -3,7 +3,6 @@ const cron = require("node-cron");
 
 const config = require("../config");
 const { checkInternships } = require("../services/internshipChecker");
-const { startScheduler } = require("../services/communityScheduler");
 
 
 const name = Events.ClientReady;
@@ -77,12 +76,6 @@ async function execute(readyClient) {
 
     console.log(
         "Scheduler aktif. Bot akan mengecek lowongan setiap 6 jam."
-    );
-
-    startScheduler(readyClient);
-
-    console.log(
-        "Scheduler komunitas aktif (reminder & giveaway dicek setiap 30 detik)."
     );
 }
 

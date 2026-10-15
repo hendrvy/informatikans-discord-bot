@@ -59,20 +59,6 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
 - Jika event dibuat manual lewat UI Discord (bukan via `/create_event`), atau role tidak diset, reminder akan fallback ping **@everyone**.
 - Mapping role target reminder kini **disimpan di SQLite**, jadi tidak hilang lagi saat bot restart.
 
-### ⏰ Utilitas Komunitas
-
-- `/remindme <waktu> <pesan>` — pengingat pribadi, contoh: `/remindme waktu:10m pesan:rapat DMIF`. Format waktu: `10m` (menit), `2h` (jam), `1d` (hari), atau gabungan `1d 12h`. Maksimal 90 hari. Reminder tersimpan di SQLite sehingga tetap terkirim walaupun bot restart. Jika channel asal sudah terhapus, pengingat dikirim via DM.
-- `/poll <pertanyaan> [opsi] [durasi_jam] [multi_jawaban]` — polling native Discord. Tanpa opsi → polling Ya/Tidak. Opsi dipisah koma (maks 10). Durasi 1–32 jam (default 24).
-- `/giveaway start <hadiah> <durasi>` (khusus **Manage Server**) — mulai giveaway; peserta ikut dengan react 🎉, pemenang diundi otomatis saat waktu habis. `/giveaway list` untuk melihat yang masih berjalan.
-- `/rolepanel <judul> <role_1..role_10>` (khusus **Manage Roles**) — membuat panel self-role dengan select menu. Member bisa ambil role dengan memilih, dan lepas role dengan menghapus pilihan.
-
-### 🎮 Fun & Games
-
-- `/trivia [kategori]` — kuis pilihan ganda (sumber: Open Trivia DB). Jawab lewat tombol dalam 20 detik; jawaban benar dapat 1 poin. Ada kategori umum, film, musik, games, matematika, computer science, sejarah, olahraga.
-- `/leaderboard [user]` — papan peringkat poin trivia server (atau cek poin user tertentu).
-- `/rps <lawan>` — suit batu-kertas-gunting head-to-head via tombol, pilihan tersembunyi, giliran 60 detik.
-- `/8ball <pertanyaan>` — tanya apa saja ke magic 8-ball.
-
 ## Prasyarat
 
 - Node.js v22 atau lebih baru.
@@ -139,29 +125,20 @@ src/
 │   ├── testjob.js
 │   ├── cari.js                       # Cari lowongan on-demand dengan filter
 │   ├── createEvent.js
-│   ├── deleteEvent.js
-│   ├── remindme.js                   # Pengingat pribadi (/remindme)
-│   ├── poll.js                       # Polling native Discord
-│   ├── giveaway.js                   # Giveaway (start/list)
-│   ├── rolepanel.js                  # Panel self-role (select menu)
-│   ├── trivia.js                     # Kuis trivia (Open Trivia DB)
-│   ├── leaderboard.js                # Papan peringkat poin trivia
-│   ├── rps.js                        # Suit batu-kertas-gunting
-│   └── 8ball.js                      # Magic 8-ball
+│   └── deleteEvent.js
 ├── legacyCommands/                   # Prefix command ("$")
 │   ├── ping.js
 │   ├── say.js
 │   └── sayto.js
 ├── events/                           # Discord client event handler
-│   ├── ready.js                      # Registrasi command, presence, start cron scraping + scheduler komunitas
-│   ├── interactionCreate.js          # Router slash command + tombol/select menu (rolepanel, rps, trivia)
+│   ├── ready.js                      # Registrasi command, presence, start cron scraping
+│   ├── interactionCreate.js          # Router slash command + select menu (help)
 │   ├── messageCreate.js              # Router prefix command + autorole + role angkatan
 │   └── guildScheduledEventCreate.js  # Trigger penjadwalan reminder event
 ├── services/
 │   ├── internshipChecker.js          # Logic pengecekan & posting lowongan (dipanggil dari ready.js & cron)
 │   ├── eventReminder.js              # Hitung & kirim reminder scheduled event
-│   ├── communityScheduler.js         # Tick 30 detik: kirim /remindme & undi giveaway
-│   ├── store.js                      # SQLite semua fitur komunitas (reminder, giveaway, poin trivia, role reminder)
+│   ├── store.js                      # SQLite mapping role reminder event
 │   ├── jobCollector.js               # Menggabungkan lowongan dari semua sumber
 │   ├── jobFilter.js                  # Filter relevansi (magang + bidang IT)
 │   ├── jobDetailCollector.js         # Scraping detail lowongan (DevJobsIndo)
@@ -178,7 +155,7 @@ src/
 │   ├── time.js                       # Helper parse/format waktu Asia/Jakarta
 │   └── retry.js                      # Helper retry + exponential backoff untuk request HTTP
 └── data/
-    └── postedJobs.db                 # Database SQLite (dedup lowongan + semua data fitur komunitas)
+    └── postedJobs.db                 # Database SQLite (dedup lowongan + mapping role reminder)
 ```
 
 ## Catatan Keamanan
@@ -190,14 +167,12 @@ src/
 ## Keterbatasan yang Diketahui
 
 - Scraping DevJobsIndo & Kalibrr bergantung pada struktur HTML situs tersebut; jika situs berubah, scraping bisa gagal. Sudah ada retry + alert otomatis ke channel (dan fallback DM ke `ADMIN_USER_ID` jika diisi).
-- Game RPS menyimpan state in-memory; game yang sedang berjalan akan hang jika bot restart di tengah permainan (pemain perlu memulai ulang).
-- Soal trivia berbahasa Inggris (dari Open Trivia DB); belum ada terjemahan otomatis.
 
 ## Pemulihan Database Otomatis
 
 Jika file SQLite (`src/data/postedJobs.db`) korup — misalnya karena server mati mendadak atau disk penuh — bot **tidak akan crash-loop**. Saat startup, `src/utils/sqlite.js` otomatis:
 
-1. Menyelamatkan baris yang masih bisa dibaca (riwayat lowongan, reminder aktif, giveaway aktif, poin trivia, mapping role reminder).
+1. Menyelamatkan baris yang masih bisa dibaca (riwayat lowongan, mapping role reminder).
 2. Mengarsipkan file korup sebagai `postedJobs.db.corrupt-<timestamp>` (beserta `-wal`/`-shm`), tidak dihapus.
 3. Membuat database baru dan memulihkan data yang terselamatkan.
 
@@ -209,7 +184,7 @@ Log kejadiannya ditandai dengan `🚨 Database SQLite korup terdeteksi` dan `♻
 npm test
 ```
 
-Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store fitur komunitas (`store.js`), parsing durasi/opsi/logika game (`communityCommands.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
+Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store mapping role reminder (`store.js`), verifikasi signature webhook deploy (`deployListener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
 
 ## Deployment dengan Docker
 
