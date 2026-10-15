@@ -7,6 +7,7 @@ const { Collection } = require("discord.js");
 // LOAD SLASH COMMANDS
 // ==============================
 // Setiap file di src/commands/ harus export { data, execute }
+// File test (*.test.js) dilewati supaya tidak ikut ke-load saat bot jalan.
 
 function loadSlashCommands() {
 
@@ -16,7 +17,7 @@ function loadSlashCommands() {
 
     const files = fs
         .readdirSync(commandsDir)
-        .filter(file => file.endsWith(".js"));
+        .filter(file => file.endsWith(".js") && !file.endsWith(".test.js"));
 
     for (const file of files) {
 
@@ -53,7 +54,7 @@ function loadLegacyCommands() {
 
     const files = fs
         .readdirSync(commandsDir)
-        .filter(file => file.endsWith(".js"));
+        .filter(file => file.endsWith(".js") && !file.endsWith(".test.js"));
 
     for (const file of files) {
 
