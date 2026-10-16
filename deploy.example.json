@@ -1,0 +1,8 @@
+{
+  "repo": "hendrvy/informatikans-discord-bot",
+  "branch": "main",
+  "secret": "",
+  "port": 9000,
+  "webhookPath": "/webhook",
+  "pollSeconds": 120
+}

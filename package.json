@@ -2,9 +2,10 @@
   "name": "internship-discord-bot",
   "version": "2.1.0",
   "description": "Discord bot komunitas Informatikans: posting lowongan magang IT otomatis (Jooble + DevJobsIndo + Kalibrr), autorole + role angkatan, scheduled event reminder, panel help interaktif, dan auto-deploy webhook.",
-  "main": "src/index.js",
+  "main": "deploy.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node deploy.js",
+    "bot": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest"
   },

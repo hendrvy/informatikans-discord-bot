@@ -4,3 +4,10 @@ node_modules
 # Runtime data (SQLite database & legacy JSON backup)
 src/data/
 *.log
+
+# Auto-deploy: config lokal & state commit terakhir
+deploy.config.json
+.deploy-state.json
+
+# npm cache yang kadang nyangkut di folder project
+.npm/

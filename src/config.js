@@ -79,7 +79,14 @@ const config = {
 
     // Auto-deploy webhook (opsional). Kosongkan WEBHOOK_SECRET untuk
     // melewati verifikasi signature.
-    webhookPort: process.env.WEBHOOK_PORT || 9000,
+    //
+    // Pterodactyl membagikan port alokasinya lewat SERVER_PORT, jadi itu
+    // yang diprioritaskan sebelum jatuh ke WEBHOOK_PORT manual.
+    webhookPort:
+        process.env.SERVER_PORT ||
+        process.env.PORT ||
+        process.env.WEBHOOK_PORT ||
+        9000,
     webhookPath: process.env.WEBHOOK_PATH || "/webhook",
     webhookSecret: process.env.WEBHOOK_SECRET || null,
     webhookBranch: process.env.WEBHOOK_BRANCH || "main"

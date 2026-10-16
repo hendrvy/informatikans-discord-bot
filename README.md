@@ -14,22 +14,72 @@ Bot Discord komunitas Informatikans. Awalnya ada dua bot terpisah (bot utilitas/
 - Slash command `/testjob` untuk melihat preview format embed lowongan (khusus admin).
 - Slash command `/cari` untuk mencari lowongan on-demand dengan filter kata kunci, kategori, lokasi, dan sumber.
 
-### 🚀 Auto-Deploy Webhook (opsional)
+### 🚀 Auto-Deploy Otomatis (Pterodactyl-ready)
 
-Bot punya webhook listener bawaan (`src/autodeploy/listener.js`) — push ke `main` akan otomatis `git pull` + `npm install --omit=dev` lalu `process.exit(0)` supaya panel (Pterodactyl/dll.) me-restart bot dengan kode baru. Tidak butuh pm2.
+Push ke `main` → bot otomatis update tanpa perlu sentuh panel. Dijalankan oleh
+**supervisor** (`deploy.js`) yang mengawasi proses bot:
+
+```
+node deploy.js            <- startup command di panel
+ └─ src/index.js          <- proses bot (Discord + webhook listener)
+```
+
+Supervisor tidak pernah exit dan tidak membuka port sendiri, jadi panel tidak
+akan menandai server **offline**. Yang di-restart saat deploy hanya proses
+bot-nya.
+
+Update dipicu dua jalur (dua-duanya aktif):
+
+- **Webhook** — GitHub kirim push event, langsung deploy.
+- **Polling** — cek tiap `POLL_SECONDS` (default 120 detik), jadi webhook yang gagal terkirim tetap tersusul.
+
+Yang terjadi tiap deploy:
+
+| Yang berubah | Aksi | Downtime |
+|---|---|---|
+| `README.md` / `*.test.js` saja | dicatat di log, tidak restart | tidak ada |
+| File `src/**.js` | proses bot di-restart | ±2 detik |
+| `package-lock.json` | `npm install --omit=dev` lalu restart | ±10 detik |
+| `deploy.js` sendiri | log peringatan, restart manual dari panel | tidak ada |
+
+**File yang tidak pernah ditimpa:** `.env`, `src/data/` (database SQLite),
+`node_modules/`, `.git/`, `deploy.config.json`, `.deploy-state.json`. Token dan
+riwayat lowongan aman saat deploy.
+
+Shutdown selalu graceful — bot diberi waktu 10 detik untuk disconnect dari
+gateway Discord dan menutup koneksi SQLite, supaya database WAL tidak korup.
 
 Setup:
 
-1. Pastikan port `WEBHOOK_PORT` (default `9000`) ter-expose/ter-forward dari container ke interface publik VPS.
-2. GitHub → **Settings → Webhooks → Add webhook**:
-   - Payload URL: `http://<ip-vps>:9000/webhook`
-   - Content type: **application/json**
-   - Secret: isi string acak, lalu samakan dengan env `WEBHOOK_SECRET` di server
-   - Events: **Just the push event**
-3. Env terkait (lihat `.env.example`): `WEBHOOK_PORT`, `WEBHOOK_PATH`, `WEBHOOK_BRANCH`, `WEBHOOK_SECRET`, `WEBHOOK_ENABLED=false` untuk mematikan fitur ini.
-4. `git pull` harus bisa jalan non-interaktif (repo public, atau token di remote URL working copy server).
+1. Startup command di panel: `node deploy.js`. Port dari panel otomatis terbaca lewat `SERVER_PORT`.
+2. Copy `deploy.example.json` jadi `deploy.config.json`, lalu isi `secret`. (Semua nilainya juga bisa diisi lewat env var, dan env var menang.)
+3. Buat secret acak:
 
-Catatan keamanan: tanpa `WEBHOOK_SECRET`, siapa pun yang bisa menjangkau port bisa memicu deploy — isi secret sesegera mungkin. Kalau `git pull`/`npm install` gagal, bot lama tetap jalan (tidak exit) sampai push berikutnya berhasil.
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+   ```
+
+4. GitHub → **Settings → Webhooks → Add webhook**:
+   - Payload URL: `http://<ip>:<port>/webhook`
+   - Content type: **application/json**
+   - Secret: samakan dengan `secret` di `deploy.config.json`
+   - Events: **Just the push event**
+
+Route yang tersedia:
+
+- `POST /webhook` — diverifikasi HMAC-SHA256. Event/branch yang tidak cocok dibalas `202` dan diabaikan.
+- `GET /health` — status bot, SHA yang sedang jalan, dan waktu deploy terakhir.
+
+Catatan keamanan: tanpa secret, siapa pun yang bisa menjangkau port bisa memicu
+deploy — isi sesegera mungkin. Kalau `npm install` gagal, bot lama tetap jalan
+dan state tidak dimajukan, jadi polling berikutnya akan mencoba ulang.
+
+> **`deploy.js` harus ter-commit dan ter-push ke repo.** Kalau tidak, setiap
+> pull akan menghapusnya (sudah ada mekanisme pemulihan otomatis, tapi tetap
+> dicatat sebagai peringatan di log).
+
+Untuk menjalankan bot tanpa supervisor (listener tetap jalan dengan mekanisme
+lama), pakai `npm run bot`.
 
 ### 🛠️ Utility
 
@@ -105,6 +155,13 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
    npm start
    ```
 
+   `npm start` menjalankan supervisor auto-deploy (`deploy.js`) — ini yang
+   dipakai di server/panel. Untuk menjalankan botnya saja tanpa supervisor:
+
+   ```bash
+   npm run bot
+   ```
+
    Untuk mode development (auto-restart saat ada perubahan kode):
 
    ```bash
@@ -114,11 +171,12 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
 ## Struktur Proyek
 
 ```
+deploy.js                             # 🚀 Supervisor auto-deploy (entry point produksi)
 src/
-├── index.js                          # Entry point: setup client, load commands/events, login
+├── index.js                          # Entry point bot: setup client, load commands/events, login
 ├── config.js                         # Baca & validasi semua env var di satu tempat
 ├── autodeploy/
-│   └── listener.js                   # 🚀 Webhook GitHub → git pull → npm install → restart
+│   └── listener.js                   # Webhook GitHub → lapor ke supervisor (atau deploy sendiri)
 ├── commands/                         # Slash command ("/")
 │   ├── ping.js
 │   ├── help.js                       # Menu panduan interaktif semua fitur
@@ -184,7 +242,7 @@ Log kejadiannya ditandai dengan `🚨 Database SQLite korup terdeteksi` dan `♻
 npm test
 ```
 
-Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store mapping role reminder (`store.js`), verifikasi signature webhook deploy (`deployListener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
+Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store mapping role reminder (`store.js`), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
 
 ## Deployment dengan Docker
 

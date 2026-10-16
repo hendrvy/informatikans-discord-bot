@@ -2,7 +2,11 @@ const { Client, GatewayIntentBits, Collection } = require("discord.js");
 
 const config = require("./config");
 const { loadSlashCommands, loadLegacyCommands } = require("./utils/loadCommands");
-const { startAutoDeploy } = require("./autodeploy/listener");
+const {
+    startAutoDeploy,
+    stopAutoDeploy,
+    setReadyCheck
+} = require("./autodeploy/listener");
 
 
 // ==============================
@@ -67,7 +71,76 @@ for (const file of eventFiles) {
 // Bisa dimatikan dengan set WEBHOOK_ENABLED=false di .env.
 
 if (process.env.WEBHOOK_ENABLED !== "false") {
+
+    // Supaya /health bisa melaporkan bot benar-benar sudah connect ke
+    // Discord, bukan cuma prosesnya hidup.
+    setReadyCheck(() => client.isReady());
+
     startAutoDeploy();
+}
+
+
+// ==============================
+// GRACEFUL SHUTDOWN
+// ==============================
+//
+// Supervisor (deploy.js) mengirim SIGTERM saat mau me-restart bot dengan
+// kode baru. Tanpa handler ini prosesnya di-SIGKILL, dan SIGKILL di
+// tengah write SQLite (mode WAL) itu persis skenario yang membuat
+// database corrupt. Jadi: lepas port, disconnect gateway, tutup DB.
+
+let shuttingDown = false;
+
+async function shutdown(signal) {
+
+    if (shuttingDown) return;
+
+    shuttingDown = true;
+
+    console.log(`[shutdown] menerima ${signal}, menutup dengan rapi...`);
+
+    // Jaring pengaman: kalau ada langkah yang menggantung, jangan sampai
+    // supervisor harus SIGKILL kita.
+    const failsafe = setTimeout(() => {
+        console.warn("[shutdown] timeout, keluar paksa.");
+        process.exit(0);
+    }, 8000);
+
+    failsafe.unref();
+
+    try {
+        await stopAutoDeploy();
+    } catch (error) {
+        console.error("[shutdown] gagal menutup listener:", error.message);
+    }
+
+    try {
+        await client.destroy();
+    } catch (error) {
+        console.error("[shutdown] gagal menutup Discord client:", error.message);
+    }
+
+    // Dua modul ini memegang handle SQLite masing-masing.
+    for (const modulePath of ["./services/store", "./services/duplicateChecker"]) {
+        try {
+            require(modulePath).closeDb();
+        } catch (error) {
+            console.error(
+                `[shutdown] gagal menutup database (${modulePath}):`,
+                error.message
+            );
+        }
+    }
+
+    console.log("[shutdown] selesai.");
+
+    clearTimeout(failsafe);
+
+    process.exit(0);
+}
+
+for (const signal of ["SIGTERM", "SIGINT"]) {
+    process.on(signal, () => shutdown(signal));
 }
 
 

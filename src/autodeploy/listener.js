@@ -2,16 +2,20 @@
 // WEBHOOK AUTO-DEPLOY LISTENER
 // ==============================
 //
-// Listener ini jalan DI DALAM proses bot (bukan proses terpisah),
-// supaya tidak butuh pm2/shell access di server panel.
+// Listener ini jalan DI DALAM proses bot dan punya dua mode:
 //
-// Alur deploy:
-//   GitHub push ke main  →  POST /webhook
-//     → verifikasi secret (kalau WEBHOOK_SECRET diisi)
-//     → git pull
-//     → npm install --omit=dev
-//     → process.exit(0)  → panel (Pterodactyl/dll.) restart otomatis
-//       → bot hidup lagi, kali ini dengan kode baru
+// 1. SUPERVISED (dipakai di produksi, lewat `node deploy.js`)
+//    Webhook yang masuk diteruskan ke supervisor lewat IPC. Supervisor
+//    yang melakukan git pull + npm install, lalu me-restart proses bot
+//    ini dengan SIGTERM. Proses bot TIDAK exit sendiri.
+//
+//      GitHub push → POST /webhook → verifikasi secret
+//        → process.send({ type: "deploy" }) → supervisor kerja
+//
+// 2. STANDALONE (fallback, kalau bot dijalankan langsung via `npm run bot`)
+//    Tidak ada supervisor, jadi listener deploy sendiri seperti dulu:
+//    git pull → npm install → process.exit(0) dan berharap panel
+//    me-restart. Kurang andal, tapi lebih baik daripada tidak jalan.
 //
 // Semua langkah diberi "deploy lock" + timeout agar dua webhook yang
 // datang berdekatan tidak menumpuk, dan hang tidak menggantung bot
@@ -25,10 +29,26 @@ const path = require("path");
 
 const config = require("../config");
 
-const PORT = config.webhookPort;
-const WEBHOOK_PATH = config.webhookPath;
-const WEBHOOK_SECRET = config.webhookSecret;
-const BRANCH = config.webhookBranch;
+
+// Supervisor mengirim konfigurasi lewat env supaya port/secret/branch
+// yang dipakai persis sama dengan yang dia pegang.
+let supervisorConfig = {};
+
+try {
+    supervisorConfig = JSON.parse(process.env.HMIF_DEPLOY_CONFIG || "{}");
+} catch {
+    supervisorConfig = {};
+}
+
+// IPC channel hanya ada kalau proses ini di-spawn oleh supervisor.
+const SUPERVISED =
+    process.env.HMIF_SUPERVISED === "true" &&
+    typeof process.send === "function";
+
+const PORT = supervisorConfig.port || config.webhookPort;
+const WEBHOOK_PATH = supervisorConfig.webhookPath || config.webhookPath;
+const WEBHOOK_SECRET = supervisorConfig.secret || config.webhookSecret;
+const BRANCH = supervisorConfig.branch || config.webhookBranch;
 
 const PROJECT_DIR = path.resolve(__dirname, "../..");
 
@@ -38,27 +58,38 @@ const PROJECT_DIR = path.resolve(__dirname, "../..");
 const GIT_TIMEOUT_MS = 60 * 1000;
 const NPM_TIMEOUT_MS = 5 * 60 * 1000;
 
-// Jeda minimal antar deploy (proteksi dorongan webhook beruntun).
+// Jarak minimum antar deploy, supaya push beruntun tidak jadi badai.
 
 const DEPLOY_COOLDOWN_MS = 15 * 1000;
 
 let deploying = false;
-
+let pendingDeploy = false;
 let lastDeployAt = 0;
 
-let pendingDeploy = false;
+// Status deploy terakhir, dikirim supervisor lewat IPC. Dipakai di
+// endpoint /health supaya bisa dicek dari luar tanpa buka panel.
+let deployState = { sha: "", lastDeploy: null, mode: "standalone" };
+
+// Diisi src/index.js supaya /health bisa melaporkan bot benar-benar
+// sudah connect ke Discord, bukan cuma proses hidup.
+let readyCheck = () => false;
+
+function setReadyCheck(fn) {
+    if (typeof fn === "function") readyCheck = fn;
+}
 
 
 // ==============================
 // VERIFIKASI SIGNATURE GITHUB
 // ==============================
-// Header X-Hub-Signature-256 = "sha256=" + HMAC-SHA256(secret, body).
-// Lewatkan WEBHOOK_SECRET di .env untuk mengaktifkan.
+//
+// GitHub mengirim X-Hub-Signature-256 = HMAC-SHA256(secret, rawBody).
+// Kalau WEBHOOK_SECRET tidak diisi di .env, verifikasi dilewati.
 
 function verifySignature(req, rawBody) {
 
     if (!WEBHOOK_SECRET) {
-        return true; // secret belum diisi, skip verifikasi
+        return true;
     }
 
     const signature = req.headers["x-hub-signature-256"];
@@ -120,7 +151,22 @@ function runCommand(command, timeoutMs) {
 // DEPLOY
 // ==============================
 
-async function deploy() {
+async function deploy(reason = "webhook") {
+
+    // Mode supervised: supervisor punya logika deploy yang jauh lebih
+    // lengkap (cek SHA, tarball fallback, restart graceful). Cukup
+    // titip pesan, jangan kerja sendiri.
+
+    if (SUPERVISED) {
+
+        process.send({ type: "deploy", reason });
+
+        console.log(
+            `[autodeploy] deploy diteruskan ke supervisor (${reason}).`
+        );
+
+        return;
+    }
 
     // Cooldown sederhana: kalau baru saja deploy, antre sekali saja.
 
@@ -150,8 +196,7 @@ async function deploy() {
 
         if (!pull.ok) {
 
-            // Gagal pull: JANGAN exit. Bot lama tetap jalan, jangan
-            // risiko mati tanpa kode baru yang terpasang.
+            // JANGAN exit: bot lama masih sehat.
 
             console.error(
                 "[autodeploy] git pull gagal, deploy dibatalkan:",
@@ -161,9 +206,9 @@ async function deploy() {
             return;
         }
 
-        if (/Already up to date/i.test(pull.stdout)) {
+        if (/already up to date/i.test(pull.stdout)) {
 
-            console.log("[autodeploy] tidak ada perubahan, skip deploy.");
+            console.log("[autodeploy] tidak ada commit baru.");
 
             return;
         }
@@ -185,9 +230,9 @@ async function deploy() {
             return;
         }
 
-        console.log("[autodeploy] deploy selesai, restart bot...");
+        console.log("[autodeploy] deploy selesai, keluar untuk restart...");
 
-        // Kasih waktu log terkirim dulu, lalu exit supaya panel
+        // Beri jeda supaya log terkirim dulu, lalu exit supaya panel
         // me-restart proses dengan kode yang baru.
 
         setTimeout(() => process.exit(0), 500);
@@ -198,14 +243,14 @@ async function deploy() {
 
         deploying = false;
 
-        // Selama deploy/coolown tadi masih ada push masuk, jalankan
+        // Selama deploy/cooldown tadi masih ada push masuk, jalankan
         // sekali lagi untuk memastikan tidak ada commit yang ketinggalan.
 
         if (pendingDeploy) {
 
             pendingDeploy = false;
 
-            setTimeout(() => deploy().catch(() => {}), DEPLOY_COOLDOWN_MS);
+            setTimeout(() => deploy(reason).catch(() => {}), DEPLOY_COOLDOWN_MS);
         }
     }
 }
@@ -215,15 +260,39 @@ async function deploy() {
 // HTTP SERVER
 // ==============================
 
+function sendJson(res, status, body) {
+
+    const payload = JSON.stringify(body);
+
+    res.writeHead(status, {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Content-Length": Buffer.byteLength(payload)
+    });
+
+    res.end(payload);
+}
+
+
 const server = http.createServer((req, res) => {
 
-    // Health check sederhana.
+    // Health check: dipakai untuk memastikan deploy benar-benar nyangkut.
 
     if (req.method === "GET" && req.url === "/health") {
 
-        res.writeHead(200, { "Content-Type": "application/json" });
-
-        return res.end(JSON.stringify({ status: "ok", deploying }));
+        return sendJson(res, 200, {
+            status: "ok",
+            uptime: Math.round(process.uptime()),
+            ready: readyCheck(),
+            deploying,
+            supervised: SUPERVISED,
+            sha: deployState.sha || null,
+            lastDeploy: deployState.lastDeploy,
+            mode: deployState.mode,
+            branch: BRANCH,
+            hasSecret: Boolean(WEBHOOK_SECRET),
+            node: process.version
+        });
     }
 
     if (req.method !== "POST" || !req.url.startsWith(WEBHOOK_PATH)) {
@@ -269,6 +338,15 @@ const server = http.createServer((req, res) => {
             return res.end("invalid signature");
         }
 
+        const event = req.headers["x-github-event"];
+
+        // GitHub mengirim event 'ping' saat webhook pertama disimpan.
+
+        if (event === "ping") {
+
+            return sendJson(res, 200, { ok: true, pong: true });
+        }
+
         let payload;
 
         try {
@@ -282,36 +360,41 @@ const server = http.createServer((req, res) => {
             return res.end("invalid json");
         }
 
-        // Balas 200 dulu ke GitHub sebelum proses deploy, biar
-        // tidak kena timeout dari sisi GitHub.
-
-        res.writeHead(200);
-
-        res.end("ok");
-
-        const event = req.headers["x-github-event"];
-
         const branch = payload.ref
             ? payload.ref.replace("refs/heads/", "")
             : null;
 
-        if (event === "push" && branch === BRANCH) {
-
-            console.log(
-                `[autodeploy] push terdeteksi di branch '${branch}', deploy...`
-            );
-
-            deploy().catch((error) => {
-
-                console.error("[autodeploy] error deploy:", error.message);
-            });
-
-        } else {
+        if (event !== "push" || branch !== BRANCH) {
 
             console.log(
                 `[autodeploy] diabaikan: event=${event} branch=${branch}`
             );
+
+            return sendJson(res, 202, {
+                ignored: true,
+                event,
+                branch
+            });
         }
+
+        const pusher = payload.pusher?.name || payload.sender?.login || "unknown";
+
+        console.log(
+            `[autodeploy] push terdeteksi di branch '${branch}' oleh ${pusher}, deploy...`
+        );
+
+        // Balas GitHub dulu supaya delivery tidak timeout, baru kerja.
+
+        sendJson(res, 202, {
+            ok: true,
+            deploying: true,
+            branch
+        });
+
+        Promise.resolve(deploy(`webhook (${pusher})`)).catch((error) => {
+
+            console.error("[autodeploy] error deploy:", error.message);
+        });
     });
 
     req.on("error", () => {
@@ -321,13 +404,35 @@ const server = http.createServer((req, res) => {
 });
 
 
+// Supervisor mengirim SHA/lastDeploy terbaru setiap selesai deploy.
+
+if (SUPERVISED) {
+
+    process.on("message", (msg) => {
+
+        if (msg?.type === "state") {
+
+            deployState = {
+                sha: msg.sha || "",
+                lastDeploy: msg.lastDeploy || null,
+                mode: msg.mode || "supervised"
+            };
+        }
+    });
+}
+
+
 function startAutoDeploy() {
 
     server.listen(PORT, () => {
 
         console.log(
-            `[autodeploy] webhook listener aktif di port ${PORT}${WEBHOOK_PATH} (branch: ${BRANCH})`
+            `[autodeploy] webhook listener aktif di port ${PORT}${WEBHOOK_PATH} (branch: ${BRANCH}, ${SUPERVISED ? "supervised" : "standalone"})`
         );
+
+        // Minta state awal + kabari supervisor bahwa port sudah terbuka.
+
+        if (SUPERVISED) process.send({ type: "ready" });
     });
 
     server.on("error", (error) => {
@@ -343,4 +448,21 @@ function startAutoDeploy() {
 }
 
 
-module.exports = { startAutoDeploy, deploy, verifySignature };
+function stopAutoDeploy() {
+
+    return new Promise((resolve) => {
+
+        if (!server.listening) return resolve();
+
+        server.close(() => resolve());
+    });
+}
+
+
+module.exports = {
+    startAutoDeploy,
+    stopAutoDeploy,
+    setReadyCheck,
+    deploy,
+    verifySignature
+};
