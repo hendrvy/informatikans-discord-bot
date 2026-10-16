@@ -8,9 +8,11 @@ const name = Events.MessageCreate;
 
 
 // Kata kunci yang wajib ada semua di pesan perkenalan agar terdeteksi.
+// "panggilan" (bukan "nama panggilan") supaya member yang menulis
+// "Panggilan: X" tanpa kata "Nama" di depannya tetap terdeteksi.
 const INTRO_FORMAT_KEYWORDS = [
     "nama",
-    "nama panggilan",
+    "panggilan",
     "angkatan",
     "hobi",
     "minat"

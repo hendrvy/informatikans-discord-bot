@@ -20,7 +20,9 @@ const CATEGORIES = {
         title: "Umum & Utilitas",
         description: [
             "`/help` — tampilkan menu bantuan ini.",
-            "`/ping` — cek latency bot."
+            "`/ping` — cek latency bot.",
+            "`/say` — bot kirim ulang pesanmu di channel ini (admin).",
+            "`/sayto` — bot kirim pesanmu ke channel lain (admin)."
         ].join("\n")
     },
 
