@@ -45,10 +45,7 @@ const CATEGORIES = {
         emoji: "💡",
         title: "Komunitas",
         description: [
-            "`/saran isi:<teks>` — kirim saran untuk komunitas. Saran masuk ke channel saran dengan vote 👍/👎.",
-            "Admin (Manage Server) bisa menandai saran ✅ Disetujui atau ❌ Ditolak lewat tombol di embed.",
-            "",
-            "💡 Set channel tujuan lewat env `SUGGESTION_CHANNEL_ID` (default: channel lowongan)."
+            "`/saran isi:<teks>` — kirim saran untuk komunitas. Saran kamu akan tampil di channel saran."
         ].join("\n")
     },
 

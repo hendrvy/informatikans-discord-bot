@@ -1,7 +1,6 @@
 const { Events, MessageFlags } = require("discord.js");
 
 const { handleHelpSelect } = require("../commands/help");
-const { handleSuggestionButton } = require("../commands/saran");
 const { handleJobRemindButton } = require("../services/jobReminder");
 
 
@@ -28,32 +27,6 @@ async function execute(interaction, client) {
 
             await interaction.reply({
                 content: "❌ Gagal mendaftarkan pengingat. Coba lagi nanti ya!",
-                flags: MessageFlags.Ephemeral
-            }).catch(() => {});
-        }
-
-        return;
-    }
-
-    // Tombol vote & status saran (customId: sugvote:* / sugstatus:*).
-
-    if (interaction.isButton() &&
-        (interaction.customId.startsWith("sugvote:") ||
-         interaction.customId.startsWith("sugstatus:"))) {
-
-        try {
-
-            await handleSuggestionButton(interaction);
-
-        } catch (error) {
-
-            console.error(
-                "❌ Gagal memproses tombol saran:",
-                error.message
-            );
-
-            await interaction.reply({
-                content: "❌ Terjadi error saat memproses vote saran.",
                 flags: MessageFlags.Ephemeral
             }).catch(() => {});
         }

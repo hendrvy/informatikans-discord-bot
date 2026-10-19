@@ -21,10 +21,7 @@ Bot Discord komunitas Informatikans. Awalnya ada dua bot terpisah (bot utilitas/
 
 ### 💡 Saran Member (/saran)
 
-- `/saran isi:<teks>` — member mengirim saran; saran masuk ke channel saran (`SUGGESTION_CHANNEL_ID`, default: channel lowongan) dalam bentuk embed.
-- Semua member bisa vote **👍/👎** lewat tombol (satu vote per user, bisa diganti).
-- Admin (permission **Manage Server**) bisa menandai saran **✅ Disetujui** atau **❌ Ditolak** lewat tombol; warna & status embed ikut berubah.
-- Data saran & vote disimpan di SQLite, jadi vote tidak direset saat bot restart.
+- `/saran isi:<teks>` — member mengirim saran; saran tampil di channel saran (`SUGGESTION_CHANNEL_ID`, default: channel komunitas khusus) dalam bentuk embed sederhana tanpa tombol.
 
 ### 🚀 Auto-Deploy Otomatis (Pterodactyl-ready)
 
@@ -157,7 +154,7 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
    | `AUTOROLE_CHANNEL_IDS` | ID channel yang dipantau untuk deteksi perkenalan (pisahkan koma jika lebih dari satu). |
    | `AUTOROLE_ROLE_NAME` | Nama role utama yang diberikan setelah perkenalan, default `Informatikans`. |
    | `EVENT_ANNOUNCE_CHANNEL_ID` | Channel untuk announce event & reminder (default: sama dengan `CHANNEL_ID`). |
-   | `SUGGESTION_CHANNEL_ID` | (Opsional) Channel tujuan saran dari `/saran` (default: sama dengan `CHANNEL_ID`). |
+   | `SUGGESTION_CHANNEL_ID` | (Opsional) Channel tujuan saran dari `/saran` (default: channel komunitas khusus). |
    | `ADMIN_USER_ID` | (Opsional) User ID Discord yang menerima DM alert kritikal (scraper rusak). |
 
    > **Jangan pernah commit file `.env`.** File ini sudah masuk `.gitignore`.
@@ -211,7 +208,7 @@ src/
 ├── services/
 │   ├── internshipChecker.js          # Logic pengecekan & posting lowongan (dipanggil dari ready.js & cron)
 │   ├── eventReminder.js              # Hitung & kirim reminder scheduled event
-│   ├── store.js                      # SQLite: role reminder event, arsip lowongan, reminder deadline, saran & vote
+│   ├── store.js                      # SQLite: role reminder event, arsip lowongan, reminder deadline
 │   ├── jobCollector.js               # Menggabungkan lowongan dari semua sumber
 │   ├── jobFilter.js                  # Filter relevansi (magang + bidang IT)
 │   ├── jobDetailCollector.js         # Scraping detail lowongan (DevJobsIndo)
@@ -258,7 +255,7 @@ Log kejadiannya ditandai dengan `🚨 Database SQLite korup terdeteksi` dan `♻
 npm test
 ```
 
-Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store (`store.js` — role reminder event, arsip lowongan, reminder deadline, saran & vote), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
+Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store (`store.js` — role reminder event, arsip lowongan, reminder deadline), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
 
 ## Deployment dengan Docker
 

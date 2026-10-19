@@ -73,8 +73,9 @@ const config = {
     eventAnnounceChannelId:
         process.env.EVENT_ANNOUNCE_CHANNEL_ID || process.env.CHANNEL_ID,
 
-    // Saran member (/saran). Kosongkan untuk pakai CHANNEL_ID.
-    suggestionChannelId: process.env.SUGGESTION_CHANNEL_ID || null,
+    // Saran member (/saran). Default: channel khusus saran komunitas.
+    suggestionChannelId:
+        process.env.SUGGESTION_CHANNEL_ID || "1561626479140278302",
 
     // Monitoring: user Discord yang menerima DM alert kritikal
     // (scraper rusak, alert channel gagal). Kosongkan untuk menonaktifkan.

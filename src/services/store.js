@@ -8,8 +8,6 @@
 // - event_reminder_roles : role target reminder per scheduled event
 // - jobs_archive         : arsip lowongan yang sudah diposting (/lowongan)
 // - job_reminders        : pengingat deadline lowongan (tombol 🔔)
-// - suggestions          : saran member (/saran)
-// - suggestion_votes     : vote 👍/👎 per user per saran
 
 const path = require("path");
 const fs = require("fs");
@@ -25,8 +23,7 @@ const DB_PATH =
 
 const SALVAGE_QUERIES = [
     "SELECT event_id, role_id FROM event_reminder_roles",
-    "SELECT link, title, company, location, category, source, deadline, posted_at FROM jobs_archive",
-    "SELECT guild_id, user_id, content, status, created_at FROM suggestions"
+    "SELECT link, title, company, location, category, source, deadline, posted_at FROM jobs_archive"
 ];
 
 const { db, salvaged, recovered } = openSqliteDatabase(
@@ -75,28 +72,6 @@ db.exec(`
     ON job_reminders(sent, remind_at)
 `);
 
-db.exec(`
-    CREATE TABLE IF NOT EXISTS suggestions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        guild_id TEXT NOT NULL,
-        user_id TEXT NOT NULL,
-        author_name TEXT,
-        content TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        message_id TEXT,
-        created_at TEXT NOT NULL
-    )
-`);
-
-db.exec(`
-    CREATE TABLE IF NOT EXISTS suggestion_votes (
-        suggestion_id INTEGER NOT NULL,
-        user_id TEXT NOT NULL,
-        vote INTEGER NOT NULL,
-        PRIMARY KEY (suggestion_id, user_id)
-    )
-`);
-
 
 // ==============================
 // RESTORE DATA SETELAH RECOVERY
@@ -112,8 +87,7 @@ function restoreSalvagedData() {
 
     const [
         savedRoles,
-        savedJobs,
-        savedSuggestions
+        savedJobs
     ] = salvaged;
 
     let restoredCount = 0;
@@ -129,11 +103,6 @@ function restoreSalvagedData() {
             INSERT OR IGNORE INTO jobs_archive
                 (link, title, company, location, category, source, deadline, posted_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        const insertSuggestion = db.prepare(`
-            INSERT INTO suggestions (guild_id, user_id, author_name, content, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
         `);
 
         const restoreAll = db.transaction(() => {
@@ -153,18 +122,6 @@ function restoreSalvagedData() {
                     row.source ?? null,
                     row.deadline ?? null,
                     row.posted_at ?? new Date().toISOString()
-                );
-                restoredCount++;
-            }
-
-            for (const row of savedSuggestions ?? []) {
-                insertSuggestion.run(
-                    row.guild_id,
-                    row.user_id,
-                    row.author_name ?? null,
-                    row.content,
-                    row.status ?? "pending",
-                    row.created_at ?? new Date().toISOString()
                 );
                 restoredCount++;
             }
@@ -387,78 +344,6 @@ function markJobReminderSent(id) {
 
 
 // ==============================
-// SARAN (/saran)
-// ==============================
-
-function createSuggestion({ guildId, userId, authorName, content }) {
-
-    const result = db.prepare(`
-        INSERT INTO suggestions (guild_id, user_id, author_name, content, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    `).run(
-        guildId,
-        userId,
-        authorName ?? null,
-        content,
-        new Date().toISOString()
-    );
-
-    return result.lastInsertRowid;
-}
-
-
-function getSuggestion(id) {
-
-    return db
-        .prepare("SELECT * FROM suggestions WHERE id = ?")
-        .get(id);
-}
-
-
-function setSuggestionMessageId(id, messageId) {
-
-    db.prepare("UPDATE suggestions SET message_id = ? WHERE id = ?")
-        .run(messageId, id);
-}
-
-
-function setSuggestionStatus(id, status) {
-
-    db.prepare("UPDATE suggestions SET status = ? WHERE id = ?")
-        .run(status, id);
-}
-
-
-// Upsert vote user. Mengembalikan jumlah vote terbaru { up, down }.
-
-function voteSuggestion(suggestionId, userId, vote) {
-
-    db.prepare(`
-        INSERT INTO suggestion_votes (suggestion_id, user_id, vote)
-        VALUES (?, ?, ?)
-        ON CONFLICT(suggestion_id, user_id)
-        DO UPDATE SET vote = excluded.vote
-    `).run(suggestionId, userId, vote);
-
-    return getSuggestionVoteCounts(suggestionId);
-}
-
-
-function getSuggestionVoteCounts(suggestionId) {
-
-    const row = db.prepare(`
-        SELECT
-            COALESCE(SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END), 0) AS up,
-            COALESCE(SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END), 0) AS down
-        FROM suggestion_votes
-        WHERE suggestion_id = ?
-    `).get(suggestionId);
-
-    return { up: row.up, down: row.down };
-}
-
-
-// ==============================
 // CLEANUP
 // ==============================
 
@@ -482,14 +367,6 @@ module.exports = {
     addJobReminders,
     getDueJobReminders,
     markJobReminderSent,
-
-    // saran
-    createSuggestion,
-    getSuggestion,
-    setSuggestionMessageId,
-    setSuggestionStatus,
-    voteSuggestion,
-    getSuggestionVoteCounts,
 
     closeDb
 };
