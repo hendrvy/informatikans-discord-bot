@@ -31,10 +31,24 @@ const CATEGORIES = {
         title: "Lowongan Magang IT",
         description: [
             "Lowongan baru diposting otomatis setiap 6 jam dari **Jooble**, **DevJobsIndo**, dan **Kalibrr**.",
+            "`/lowongan [kategori] [kata_kunci] [jumlah]` — lihat arsip lowongan yang sudah diposting.",
             "`/cari [kata_kunci] [kategori] [lokasi] [sumber]` — cari lowongan on-demand.",
             "`/testjob` — preview format embed lowongan (admin).",
             "",
+            "🔔 Klik tombol **Ingatkan saya** di embed lowongan untuk dapat DM pengingat H-3 & H-1 sebelum deadline.",
+            "",
             "⚠️ Selalu verifikasi info di link resmi sebelum melamar — waspada penipuan!"
+        ].join("\n")
+    },
+
+    komunitas: {
+        emoji: "💡",
+        title: "Komunitas",
+        description: [
+            "`/saran isi:<teks>` — kirim saran untuk komunitas. Saran masuk ke channel saran dengan vote 👍/👎.",
+            "Admin (Manage Server) bisa menandai saran ✅ Disetujui atau ❌ Ditolak lewat tombol di embed.",
+            "",
+            "💡 Set channel tujuan lewat env `SUGGESTION_CHANNEL_ID` (default: channel lowongan)."
         ].join("\n")
     },
 

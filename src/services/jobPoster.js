@@ -5,6 +5,8 @@ const {
     savePostedJob
 } = require("./duplicateChecker");
 
+const { saveJobArchive } = require("./store");
+
 const { getJobCategory } = require("./jobCategory");
 
 
@@ -270,23 +272,51 @@ function createJobEmbed(job) {
 
 
 // ==============================
-// TOMBOL LINK
+// TOMBOL LINK + REMINDER
 // ==============================
 
 function buildJobComponents(job) {
 
-    if (!job.link) {
-        return [];
-    }
+    const rows = [];
 
-    return [
-        new ActionRowBuilder().addComponents(
+    const actionRow = new ActionRowBuilder();
+
+    // Tombol link pendaftaran (link button, tidak butuh handler).
+
+    if (job.link) {
+
+        actionRow.addComponents(
             new ButtonBuilder()
                 .setLabel(" Lamar Sekarang")
                 .setStyle(ButtonStyle.Link)
                 .setURL(job.link)
-        )
-    ];
+        );
+    }
+
+    // Tombol "Ingatkan saya" — hanya kalau deadline valid & di masa
+    // depan. jobId disimpan di customId untuk handler tombol.
+
+    const jobId = job.archiveId;
+
+    const deadline = new Date(job.deadline || "");
+
+    if (jobId && !isNaN(deadline.getTime()) &&
+        deadline.getTime() > Date.now()) {
+
+        actionRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`jobremind:${jobId}`)
+                .setLabel("Ingatkan saya")
+                .setEmoji("🔔")
+                .setStyle(ButtonStyle.Secondary)
+        );
+    }
+
+    if (actionRow.components.length > 0) {
+        rows.push(actionRow);
+    }
+
+    return rows;
 }
 
 
@@ -311,6 +341,23 @@ async function postJob(channel, job) {
         );
 
         return false;
+    }
+
+    // Simpan ke arsip dulu supaya tombol "🔔 Ingatkan saya" punya
+    // jobId yang bisa direferensikan.
+
+    const archiveId = saveJobArchive({
+        link: job.link,
+        title: job.position || job.title,
+        company: job.company,
+        location: job.location,
+        category: getJobCategory(job),
+        source: job.source,
+        deadline: job.deadline
+    });
+
+    if (archiveId) {
+        job.archiveId = archiveId;
     }
 
     const embed =

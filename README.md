@@ -14,6 +14,18 @@ Bot Discord komunitas Informatikans. Awalnya ada dua bot terpisah (bot utilitas/
 - Slash command `/testjob` untuk melihat preview format embed lowongan (khusus admin).
 - Slash command `/cari` untuk mencari lowongan on-demand dengan filter kata kunci, kategori, lokasi, dan sumber.
 
+### 🔔 Reminder Deadline & 📚 Arsip Lowongan
+
+- Tombol **🔔 Ingatkan saya** di setiap embed lowongan (muncul jika deadline valid) — member yang menekannya akan menerima **DM otomatis 3 hari dan 1 hari sebelum deadline**.
+- Slash command `/lowongan [kategori] [kata_kunci] [jumlah]` — melihat arsip lowongan yang sudah pernah diposting, dengan filter kategori/kata kunci. Data diambil dari SQLite, tanpa scraping ulang.
+
+### 💡 Saran Member (/saran)
+
+- `/saran isi:<teks>` — member mengirim saran; saran masuk ke channel saran (`SUGGESTION_CHANNEL_ID`, default: channel lowongan) dalam bentuk embed.
+- Semua member bisa vote **👍/👎** lewat tombol (satu vote per user, bisa diganti).
+- Admin (permission **Manage Server**) bisa menandai saran **✅ Disetujui** atau **❌ Ditolak** lewat tombol; warna & status embed ikut berubah.
+- Data saran & vote disimpan di SQLite, jadi vote tidak direset saat bot restart.
+
 ### 🚀 Auto-Deploy Otomatis (Pterodactyl-ready)
 
 Push ke `main` → bot otomatis update tanpa perlu sentuh panel. Dijalankan oleh
@@ -145,6 +157,7 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
    | `AUTOROLE_CHANNEL_IDS` | ID channel yang dipantau untuk deteksi perkenalan (pisahkan koma jika lebih dari satu). |
    | `AUTOROLE_ROLE_NAME` | Nama role utama yang diberikan setelah perkenalan, default `Informatikans`. |
    | `EVENT_ANNOUNCE_CHANNEL_ID` | Channel untuk announce event & reminder (default: sama dengan `CHANNEL_ID`). |
+   | `SUGGESTION_CHANNEL_ID` | (Opsional) Channel tujuan saran dari `/saran` (default: sama dengan `CHANNEL_ID`). |
    | `ADMIN_USER_ID` | (Opsional) User ID Discord yang menerima DM alert kritikal (scraper rusak). |
 
    > **Jangan pernah commit file `.env`.** File ini sudah masuk `.gitignore`.
@@ -182,6 +195,8 @@ src/
 │   ├── help.js                       # Menu panduan interaktif semua fitur
 │   ├── testjob.js
 │   ├── cari.js                       # Cari lowongan on-demand dengan filter
+│   ├── lowongan.js                   # Arsip lowongan yang sudah diposting
+│   ├── saran.js                      # Suggestion box dengan vote & status admin
 │   ├── createEvent.js
 │   └── deleteEvent.js
 ├── legacyCommands/                   # Prefix command ("$")
@@ -196,12 +211,13 @@ src/
 ├── services/
 │   ├── internshipChecker.js          # Logic pengecekan & posting lowongan (dipanggil dari ready.js & cron)
 │   ├── eventReminder.js              # Hitung & kirim reminder scheduled event
-│   ├── store.js                      # SQLite mapping role reminder event
+│   ├── store.js                      # SQLite: role reminder event, arsip lowongan, reminder deadline, saran & vote
 │   ├── jobCollector.js               # Menggabungkan lowongan dari semua sumber
 │   ├── jobFilter.js                  # Filter relevansi (magang + bidang IT)
 │   ├── jobDetailCollector.js         # Scraping detail lowongan (DevJobsIndo)
 │   ├── jobCategory.js                # Kategorisasi lowongan untuk embed
 │   ├── jobPoster.js                  # Membuat embed & posting ke Discord
+│   ├── jobReminder.js                # Reminder deadline lowongan (tombol 🔔 + DM H-3/H-1)
 │   └── duplicateChecker.js           # Pengecekan & penyimpanan lowongan yang sudah diposting (SQLite)
 ├── sources/
 │   ├── jooble.js                     # Integrasi Jooble API
@@ -242,7 +258,7 @@ Log kejadiannya ditandai dengan `🚨 Database SQLite korup terdeteksi` dan `♻
 npm test
 ```
 
-Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store mapping role reminder (`store.js`), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
+Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store (`store.js` — role reminder event, arsip lowongan, reminder deadline, saran & vote), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
 
 ## Deployment dengan Docker
 

@@ -3,6 +3,7 @@ const cron = require("node-cron");
 
 const config = require("../config");
 const { checkInternships } = require("../services/internshipChecker");
+const { startJobReminderScheduler } = require("../services/jobReminder");
 
 
 const name = Events.ClientReady;
@@ -77,6 +78,8 @@ async function execute(readyClient) {
     console.log(
         "Scheduler aktif. Bot akan mengecek lowongan setiap 6 jam."
     );
+
+    startJobReminderScheduler(readyClient);
 }
 
 

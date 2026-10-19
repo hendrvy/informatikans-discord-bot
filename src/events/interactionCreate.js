@@ -1,12 +1,65 @@
 const { Events, MessageFlags } = require("discord.js");
 
 const { handleHelpSelect } = require("../commands/help");
+const { handleSuggestionButton } = require("../commands/saran");
+const { handleJobRemindButton } = require("../services/jobReminder");
 
 
 const name = Events.InteractionCreate;
 
 
 async function execute(interaction, client) {
+
+    // Tombol "🔔 Ingatkan saya" di embed lowongan (customId: jobrem:<id>).
+
+    if (interaction.isButton() &&
+        interaction.customId.startsWith("jobrem:")) {
+
+        try {
+
+            await handleJobRemindButton(interaction);
+
+        } catch (error) {
+
+            console.error(
+                "❌ Gagal memproses tombol reminder lowongan:",
+                error.message
+            );
+
+            await interaction.reply({
+                content: "❌ Gagal mendaftarkan pengingat. Coba lagi nanti ya!",
+                flags: MessageFlags.Ephemeral
+            }).catch(() => {});
+        }
+
+        return;
+    }
+
+    // Tombol vote & status saran (customId: sugvote:* / sugstatus:*).
+
+    if (interaction.isButton() &&
+        (interaction.customId.startsWith("sugvote:") ||
+         interaction.customId.startsWith("sugstatus:"))) {
+
+        try {
+
+            await handleSuggestionButton(interaction);
+
+        } catch (error) {
+
+            console.error(
+                "❌ Gagal memproses tombol saran:",
+                error.message
+            );
+
+            await interaction.reply({
+                content: "❌ Terjadi error saat memproses vote saran.",
+                flags: MessageFlags.Ephemeral
+            }).catch(() => {});
+        }
+
+        return;
+    }
 
     // Select menu kategori help (customId: help_category).
 
