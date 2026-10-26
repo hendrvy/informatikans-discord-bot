@@ -120,8 +120,12 @@ async function shutdown(signal) {
         console.error("[shutdown] gagal menutup Discord client:", error.message);
     }
 
-    // Dua modul ini memegang handle SQLite masing-masing.
-    for (const modulePath of ["./services/store", "./services/duplicateChecker"]) {
+    // Tiga modul ini memegang handle SQLite masing-masing.
+    for (const modulePath of [
+        "./services/store",
+        "./services/duplicateChecker",
+        "./services/competitionDuplicateChecker"
+    ]) {
         try {
             require(modulePath).closeDb();
         } catch (error) {

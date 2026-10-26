@@ -19,6 +19,18 @@ Bot Discord komunitas Informatikans. Awalnya ada dua bot terpisah (bot utilitas/
 - Tombol **🔔 Ingatkan saya** di setiap embed lowongan (muncul jika deadline valid) — member yang menekannya akan menerima **DM otomatis 3 hari dan 1 hari sebelum deadline**.
 - Slash command `/lowongan [kategori] [kata_kunci] [jumlah]` — melihat arsip lowongan yang sudah pernah diposting, dengan filter kategori/kata kunci. Data diambil dari SQLite, tanpa scraping ulang.
 
+### 🏆 Lomba IT (AI Competition Finder)
+
+- Mengambil lomba IT Indonesia dari **InfoLomba.id** (kategori IT), **InfoLombaIT.com** (feed Blogger), dan situs resmi penyelenggara (FindIT! UGM; GEMASTIK SPA — dijadikan seed manual).
+- **AI hybrid**: lomba difilter rule-based dulu (hemat kuota), lalu diperkaya **Google Gemini** (`gemini-2.0-flash`) untuk ekstraksi terstruktur — kategori, deadline pendaftaran, biaya, target peserta, deskripsi, link pendaftaran langsung, plus verifikasi `is_tech`/`is_indonesia`. Jika API key kosong, kuota habis (429/403), atau request gagal → **fallback penuh ke ekstraksi rule-based** (regex tanggal Indonesia, link pendaftaran, kategori).
+- Anti-duplikat 3 lapis: dedup antar-sumber dalam satu batch (Set link), link ternormalisasi (query/hash/trailing slash dibuang), dan judul ternormalisasi (tahun & tanda baca dibuang) — disimpan di SQLite `posted_competitions` (masa simpan 180 hari).
+- Prioritas mahasiswa: lomba dengan target mahasiswa diposting lebih dulu (skor `getMahasiswaScore`), maksimum 10 posting per siklus.
+- Penjadwalan otomatis setiap 6 jam (offset +30 menit dari scheduler lowongan, timezone Asia/Jakarta), kill switch `LOMBA_ENABLED=false`.
+- Tombol **🔔 Ingatkan saya** di embed lomba → DM pengingat H-3 & H-1 sebelum deadline pendaftaran.
+- Slash command `/lomba [kata_kunci] [jumlah]` — arsip lomba yang sudah diposting.
+- Slash command `/testlomba [mode]` — preview format embed lomba (khusus admin).
+- Alert otomatis ke channel (fallback DM ke `ADMIN_USER_ID`) jika sumber lomba gagal 3x berturut-turut.
+
 ### 💡 Saran Member (/saran)
 
 - `/saran isi:<teks>` — member mengirim saran; saran tampil di channel saran (`SUGGESTION_CHANNEL_ID`, default: channel komunitas khusus) dalam bentuk embed sederhana tanpa tombol.
@@ -156,6 +168,10 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
    | `EVENT_ANNOUNCE_CHANNEL_ID` | Channel untuk announce event & reminder (default: sama dengan `CHANNEL_ID`). |
    | `SUGGESTION_CHANNEL_ID` | (Opsional) Channel tujuan saran dari `/saran` (default: channel komunitas khusus). |
    | `ADMIN_USER_ID` | (Opsional) User ID Discord yang menerima DM alert kritikal (scraper rusak). |
+   | `LOMBA_CHANNEL_ID` | Channel tujuan posting lomba IT (default: sama dengan `CHANNEL_ID`). |
+   | `GEMINI_API_KEY` | (Opsional) API key Google Gemini untuk ekstraksi AI lomba. Kosong = fallback rule-based murni. |
+   | `LOMBA_MAX_AI_CALLS` | Maksimum panggilan AI per siklus, default 25 (hemat kuota free tier). |
+   | `LOMBA_ENABLED` | Kill switch fitur lomba, default `true`. Set `false` untuk mematikan. |
 
    > **Jangan pernah commit file `.env`.** File ini sudah masuk `.gitignore`.
 
@@ -193,6 +209,8 @@ src/
 │   ├── testjob.js
 │   ├── cari.js                       # Cari lowongan on-demand dengan filter
 │   ├── lowongan.js                   # Arsip lowongan yang sudah diposting
+│   ├── lomba.js                      # Arsip lomba IT yang sudah diposting
+│   ├── testlomba.js                  # Preview embed lomba (admin)
 │   ├── saran.js                      # Suggestion box dengan vote & status admin
 │   ├── createEvent.js
 │   └── deleteEvent.js
@@ -216,10 +234,20 @@ src/
 │   ├── jobPoster.js                  # Membuat embed & posting ke Discord
 │   ├── jobReminder.js                # Reminder deadline lowongan (tombol 🔔 + DM H-3/H-1)
 │   └── duplicateChecker.js           # Pengecekan & penyimpanan lowongan yang sudah diposting (SQLite)
+│   ├── competitionChecker.js         # Orkestrator lomba IT (dipanggil dari ready.js & cron)
+│   ├── competitionCollector.js       # Menggabungkan lomba dari semua sumber
+│   ├── competitionFilter.js          # Filter relevansi lomba (tech + Indonesia + skor mahasiswa)
+│   ├── aiEnricher.js                 # Ekstraksi Gemini (fallback rule-based) deadline/kategori/biaya/target
+│   ├── competitionPoster.js          # Embed lomba + tombol 🔔 Daftar/Ingatkan
+│   ├── competitionReminder.js        # Reminder deadline lomba (tombol 🔔 + DM H-3/H-1)
+│   └── competitionDuplicateChecker.js # Dedup lomba (link & judul ternormalisasi, SQLite)
 ├── sources/
 │   ├── jooble.js                     # Integrasi Jooble API
 │   ├── devjobsindo.js                # Scraping DevJobsIndo
-│   └── kalibrr.js                    # Scraping Kalibrr
+│   ├── kalibrr.js                    # Scraping Kalibrr
+│   ├── infolombaId.js                # Scraping infolomba.id (kategori IT)
+│   ├── infolombaIt.js                # Feed Blogger infolombait.com
+│   └── competitionSeed.js            # Situs resmi penyelenggara (seed)
 ├── utils/
 │   ├── loadCommands.js               # Dynamic loader untuk commands/ & legacyCommands/
 │   ├── parseAngkatan.js              # Parsing tahun angkatan dari pesan perkenalan
@@ -255,7 +283,7 @@ Log kejadiannya ditandai dengan `🚨 Database SQLite korup terdeteksi` dan `♻
 npm test
 ```
 
-Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store (`store.js` — role reminder event, arsip lowongan, reminder deadline), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
+Test mencakup: filter relevansi lowongan (`jobFilter.js`), dedup storage (`duplicateChecker.js`), store (`store.js` — role reminder event, arsip lowongan, reminder deadline), filter lomba (`competitionFilter.js`), dedup lomba (`competitionDuplicateChecker.js`), enricher AI/fallback (`aiEnricher.js`), verifikasi signature webhook deploy (`listener.test.js`), parsing angkatan (`parseAngkatan.js`), dan kalkulasi jadwal reminder event (`eventReminder.js`).
 
 ## Deployment dengan Docker
 

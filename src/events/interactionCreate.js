@@ -2,6 +2,7 @@ const { Events, MessageFlags } = require("discord.js");
 
 const { handleHelpSelect } = require("../commands/help");
 const { handleJobRemindButton } = require("../services/jobReminder");
+const { handleLombaRemindButton } = require("../services/competitionReminder");
 
 
 const name = Events.InteractionCreate;
@@ -22,6 +23,31 @@ async function execute(interaction, client) {
 
             console.error(
                 "❌ Gagal memproses tombol reminder lowongan:",
+                error.message
+            );
+
+            await interaction.reply({
+                content: "❌ Gagal mendaftarkan pengingat. Coba lagi nanti ya!",
+                flags: MessageFlags.Ephemeral
+            }).catch(() => {});
+        }
+
+        return;
+    }
+
+    // Tombol "🔔 Ingatkan saya" di embed lomba (customId: lombrem:<id>).
+
+    if (interaction.isButton() &&
+        interaction.customId.startsWith("lombrem:")) {
+
+        try {
+
+            await handleLombaRemindButton(interaction);
+
+        } catch (error) {
+
+            console.error(
+                "❌ Gagal memproses tombol reminder lomba:",
                 error.message
             );
 

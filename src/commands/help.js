@@ -41,6 +41,20 @@ const CATEGORIES = {
         ].join("\n")
     },
 
+    lomba: {
+        emoji: "🏆",
+        title: "Lomba IT",
+        description: [
+            "Lomba IT baru diposting otomatis setiap 6 jam dari **InfoLomba.id**, **InfoLombaIT.com**, dan situs resmi penyelenggara — diklasifikasi dengan AI (Gemini) plus filter rule-based.",
+            "`/lomba [kata_kunci] [jumlah]` — lihat arsip lomba yang sudah diposting.",
+            "`/testlomba [mode]` — preview format embed lomba (admin).",
+            "",
+            "🔔 Klik tombol **Ingatkan saya** di embed lomba untuk dapat DM pengingat H-3 & H-1 sebelum deadline pendaftaran.",
+            "",
+            "⚠️ Selalu verifikasi info di link resmi sebelum mendaftar!"
+        ].join("\n")
+    },
+
     komunitas: {
         emoji: "💡",
         title: "Komunitas",

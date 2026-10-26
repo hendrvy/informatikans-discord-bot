@@ -59,6 +59,14 @@ const config = {
     joobleApiKey: process.env.JOOBLE_API_KEY,
     postedJobsDbPath: process.env.POSTED_JOBS_DB_PATH,
 
+    // Lomba IT feature (AI competition finder)
+    lombaChannelId:
+        process.env.LOMBA_CHANNEL_ID || process.env.CHANNEL_ID,
+    geminiApiKey: process.env.GEMINI_API_KEY || null,
+    lombaMaxAiCalls:
+        Number(process.env.LOMBA_MAX_AI_CALLS) || 25,
+    lombaEnabled: process.env.LOMBA_ENABLED !== "false",
+
     // Prefix commands
     prefix: process.env.PREFIX || "$",
 

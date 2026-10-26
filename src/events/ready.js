@@ -3,7 +3,10 @@ const cron = require("node-cron");
 
 const config = require("../config");
 const { checkInternships } = require("../services/internshipChecker");
+const { checkCompetitions } = require("../services/competitionChecker");
 const { startJobReminderScheduler } = require("../services/jobReminder");
+const { startCompetitionReminderScheduler } =
+    require("../services/competitionReminder");
 
 
 const name = Events.ClientReady;
@@ -78,6 +81,45 @@ async function execute(readyClient) {
     console.log(
         "Scheduler aktif. Bot akan mengecek lowongan setiap 6 jam."
     );
+
+    // ==============================
+    // SCHEDULER LOMBA IT
+    // ==============================
+    // Offset +30 menit dari scheduler lowongan supaya kedua siklus
+    // tidak berjalan bersamaan (hemat resource & tidak bersaing
+    // mengirim pesan ke channel yang sama).
+
+    if (config.lombaEnabled) {
+
+        await checkCompetitions(readyClient);
+
+        cron.schedule(
+            "30 */6 * * *",
+            async () => {
+
+                console.log("\n⏰ Scheduler lomba berjalan...");
+
+                await checkCompetitions(readyClient);
+
+            },
+            {
+                timezone: "Asia/Jakarta"
+            }
+        );
+
+        console.log(
+            "Scheduler lomba aktif. Bot akan mengecek lomba IT " +
+            "setiap 6 jam (offset +30 menit)."
+        );
+
+        startCompetitionReminderScheduler(readyClient);
+
+    } else {
+
+        console.log(
+            "Fitur lomba dimatikan (LOMBA_ENABLED=false)."
+        );
+    }
 
     startJobReminderScheduler(readyClient);
 }
