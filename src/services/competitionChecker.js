@@ -38,6 +38,20 @@ const { isAlreadyPosted } =
 
 const MAX_POSTS_PER_CYCLE = 10;
 
+// Postingan sumber yang lebih tua dari ini dan tanpa deadline dianggap basi.
+const STALE_POST_DAYS = 30;
+
+function isStalePost(publishedDate) {
+
+    const published = new Date(publishedDate || "").getTime();
+
+    if (isNaN(published)) {
+        return false;
+    }
+
+    return Date.now() - published > STALE_POST_DAYS * 24 * 60 * 60 * 1000;
+}
+
 // Lomba AI-enriched mendapat prioritas ekstra di urutan posting.
 
 const AI_BONUS_SCORE = 1;
@@ -259,6 +273,18 @@ async function checkCompetitions(client) {
 
                         continue;
                     }
+                }
+
+                // Deadline tak diketahui + postingan sumber sudah lama
+                // → hampir pasti lomba basi, jangan diposting.
+
+                if (!result.deadline && isStalePost(result.publishedDate)) {
+
+                    console.log(
+                        `🕰️ Postingan lama tanpa deadline, dilewati: ${competition.title}`
+                    );
+
+                    continue;
                 }
 
                 enriched.push(result);
