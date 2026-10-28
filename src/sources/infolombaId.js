@@ -116,10 +116,32 @@ function extractCompetitionsFromHtml(html) {
             details.find(".penyelenggara span").last().text()
         );
 
+        // Poster: path relatif (images/event/poster/...) → URL absolut.
+
+        const posterSrc = $card
+            .find(".img-container img")
+            .first()
+            .attr("src");
+
+        let imageUrl = "";
+
+        if (posterSrc) {
+
+            try {
+                imageUrl = new URL(
+                    encodeURI(decodeURI(posterSrc.trim())),
+                    `${BASE_URL}/`
+                ).href;
+            } catch (error) {
+                imageUrl = "";
+            }
+        }
+
         competitions.push({
 
             title,
             link,
+            imageUrl,
 
             // Slug halaman detail dipakai untuk dedup antar-siklus.
             detailSlug: `info-...-${competitionId}`,

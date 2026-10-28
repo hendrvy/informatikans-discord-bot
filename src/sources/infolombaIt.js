@@ -46,6 +46,38 @@ function htmlToText(html) {
 }
 
 // ==============================
+// AMBIL URL POSTER
+// ==============================
+//
+// Gambar pertama di konten postingan = poster. Blogger menyisipkan
+// ukuran di path (/s320/ atau /w320-h180/) — dinaikkan ke /s1000/
+// supaya poster tampil jelas di embed. Thumbnail feed (72px) hanya
+// jadi cadangan.
+
+function upgradeBloggerSize(url) {
+
+    return url.replace(
+        /\/(s\d+(-c)?|w\d+-h\d+(-[a-z]+)*)\//,
+        "/s1000/"
+    );
+}
+
+function extractImageUrl(contentHtml, thumbnailUrl) {
+
+    const match = (contentHtml || "").match(
+        /<img[^>]+src=["']([^"']+)["']/i
+    );
+
+    const candidate = match?.[1] || thumbnailUrl || "";
+
+    if (!/^https?:\/\//i.test(candidate)) {
+        return "";
+    }
+
+    return upgradeBloggerSize(candidate);
+}
+
+// ==============================
 // EKSTRAKSI DARI FEED
 // ==============================
 
@@ -89,10 +121,16 @@ function extractCompetitionsFromFeed(feedJson) {
 
         const content = htmlToText(contentHtml);
 
+        const imageUrl = extractImageUrl(
+            contentHtml,
+            entry["media$thumbnail"]?.url
+        );
+
         competitions.push({
 
             title,
             link,
+            imageUrl,
 
             organizer: "Info Lomba IT",
             target: "",
@@ -163,5 +201,6 @@ async function getInfoLombaItCompetitions() {
 module.exports = {
     getInfoLombaItCompetitions,
     extractCompetitionsFromFeed,
+    extractImageUrl,
     htmlToText
 };

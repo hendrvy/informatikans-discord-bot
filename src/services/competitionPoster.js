@@ -139,6 +139,10 @@ function createCompetitionEmbed(competition) {
 
         .setTimestamp();
 
+    if (/^https?:\/\//i.test(competition.imageUrl || "")) {
+        embed.setImage(competition.imageUrl);
+    }
+
     if (!competition.link && !competition.registrationLink) {
 
         embed.addFields({
