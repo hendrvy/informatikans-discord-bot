@@ -2,9 +2,9 @@
 // SUMBER LOMBA: INFOLOMBA.ID
 // ==============================
 //
-// Portal agregator lomba Indonesia. Kategori IT = kategori id 9.
-// Daftar lomba diambil dari halaman /events?kategori=9 — halaman ini
-// dirender server-side, cukup sekali request per siklus.
+// Portal agregator lomba Indonesia. Daftar lomba diambil dari halaman
+// /events?kategori=<id> untuk beberapa kategori teknologi — halaman
+// ini dirender server-side, satu request per kategori per siklus.
 //
 // Kartu "Most Wanted" di carousel atas ikut ter-render di HTML yang sama;
 // semuanya tidak ber-class event-container, jadi tidak terbaca scraper.
@@ -15,8 +15,13 @@ const { withRetry } = require("../utils/retry");
 
 const BASE_URL = "https://infolomba.id";
 
-// Kategori "IT" di infolomba.id
-const KATEGORI_IT = 9;
+// Kategori yang bisa berisi lomba teknologi di infolomba.id.
+// Kategori IT (9) saja sering kosong; lomba UI/UX, robot, data,
+// inovasi, dll. dikelompokkan terpisah. Penyaringan tech/non-tech
+// tetap dilakukan competitionFilter.
+//   9 IT, 44 UI/UX, 35 Robot, 58 Statistika/Data, 63 Inovasi,
+//   21 Challenge, 41 Paper, 3 KTI, 2 Desain, 29 Teknik, 16 Lainnya
+const KATEGORI_TECH = [9, 44, 35, 58, 63, 21, 41, 3, 2, 29, 16];
 
 // Ambil detail singkat tiap lomba? Tidak — biaya request per lomba
 // terlalu besar untuk siklus 6 jaman. Info kartu (target, biaya,
@@ -169,35 +174,28 @@ function extractCompetitionsFromHtml(html) {
 // AMBIL LOMBA DARI INFOLOMBA.ID
 // ==============================
 
-async function getInfoLombaCompetitions() {
+async function fetchKategori(kategori) {
 
     try {
 
         const response = await withRetry(
             () => axios.get(
-                `${BASE_URL}/events?kategori=${KATEGORI_IT}`,
+                `${BASE_URL}/events?kategori=${kategori}`,
                 { timeout: 15000, headers: HEADERS }
             ),
             {
-                retries: 3,
+                retries: 2,
                 baseDelayMs: 1000,
-                label: "InfoLomba scrape"
+                label: `InfoLomba scrape kategori ${kategori}`
             }
         );
 
-        const competitions =
-            extractCompetitionsFromHtml(response.data);
-
-        console.log(
-            `InfoLomba menemukan ${competitions.length} lomba IT.`
-        );
-
-        return competitions;
+        return extractCompetitionsFromHtml(response.data);
 
     } catch (error) {
 
         console.error(
-            "Gagal mengambil data dari infolomba.id:",
+            `Gagal mengambil infolomba.id kategori ${kategori}:`,
             error.message
         );
 
@@ -205,7 +203,48 @@ async function getInfoLombaCompetitions() {
     }
 }
 
+// Gabung semua kategori, buang duplikat (satu lomba bisa muncul
+// di beberapa kategori).
+
+function mergeUniqueById(lists) {
+
+    const seen = new Set();
+
+    const merged = [];
+
+    for (const competition of lists.flat()) {
+
+        if (seen.has(competition.competitionId)) {
+            continue;
+        }
+
+        seen.add(competition.competitionId);
+
+        merged.push(competition);
+    }
+
+    return merged;
+}
+
+async function getInfoLombaCompetitions() {
+
+    const lists = await Promise.all(
+        KATEGORI_TECH.map(fetchKategori)
+    );
+
+    const competitions = mergeUniqueById(lists);
+
+    console.log(
+        `InfoLomba menemukan ${competitions.length} lomba ` +
+        `dari ${KATEGORI_TECH.length} kategori.`
+    );
+
+    return competitions;
+}
+
 module.exports = {
     getInfoLombaCompetitions,
-    extractCompetitionsFromHtml
+    extractCompetitionsFromHtml,
+    mergeUniqueById,
+    KATEGORI_TECH
 };

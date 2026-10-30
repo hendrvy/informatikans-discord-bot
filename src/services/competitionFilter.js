@@ -157,7 +157,15 @@ function getMahasiswaScore(competition) {
 
 // Filter utama: hanya lomba IT Indonesia yang lolos.
 
+// Sumber global (Devpost, CTFtime) menandai lomba dengan
+// `global: true`: online & terbuka untuk peserta Indonesia, jadi
+// syarat penanda Indonesia dilewati — syarat tech tetap berlaku.
+
 function isRelevantCompetition(competition) {
+
+    if (competition.global) {
+        return isTechCompetition(competition);
+    }
 
     return (
         isTechCompetition(competition) &&

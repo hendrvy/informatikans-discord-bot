@@ -25,6 +25,13 @@ const HEADERS = {
 // Daftar seed: lomba besar yang layak selalu dicek.
 // url = halaman resmi, keywords = penanda cabang/kategori.
 
+//
+// deadline = batas akhir pendaftaran edisi berjalan (YYYY-MM-DD),
+// diisi MANUAL karena halaman resmi jarang memuat tahun yang jelas.
+// Seed dengan deadline yang sudah lewat otomatis dilewati checker,
+// jadi cukup perbarui tanggalnya saat edisi baru dibuka.
+// Seed tanpa deadline dan skipFetch tidak diposting (tidak ada data).
+
 const SEED_COMPETITIONS = [
     {
         title: "GEMASTIK (Pagelaran Mahasiswa Nasional Bidang TIK)",
@@ -34,8 +41,9 @@ const SEED_COMPETITIONS = [
             "programming", "cyber security", "data mining",
             "ux", "smart city", "iot"
         ],
-        // SPA — scraper akan gagal; dilewati dengan aman.
-        skipFetch: true
+        // SPA — scraper akan gagal; isi deadline manual saat dibuka.
+        skipFetch: true,
+        deadline: ""
     },
     {
         title: "FindIT! UGM (Informatics Competition)",
@@ -45,7 +53,21 @@ const SEED_COMPETITIONS = [
             "competitive programming", "ctf", "data analytics",
             "ux", "hackathon"
         ],
-        skipFetch: false
+        skipFetch: false,
+        // Edisi 2026: pendaftaran 9 Feb - 10 Mar 2026
+        deadline: "2026-03-10"
+    },
+    {
+        title: "HOLOGY (Hology UB - Technology Competition)",
+        url: "https://hology.ub.ac.id/",
+        organizer: "Universitas Brawijaya",
+        keywords: [
+            "competitive programming", "ctf", "data mining",
+            "ux", "hackathon"
+        ],
+        skipFetch: false,
+        // Edisi 9.0: pendaftaran s.d. 8 Sep 2026
+        deadline: "2026-09-08"
     }
 ];
 
@@ -53,7 +75,33 @@ const SEED_COMPETITIONS = [
 // AMBIL SATU HALAMAN SEED
 // ==============================
 
+// "2026-03-10" → ISO akhir hari (23:59 lokal), "" jika tidak valid.
+
+function parseSeedDeadline(deadline) {
+
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(deadline || "");
+
+    if (!match) {
+        return "";
+    }
+
+    const date = new Date(
+        Number(match[1]), Number(match[2]) - 1, Number(match[3]),
+        23, 59, 0
+    );
+
+    return isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
 async function fetchSeedPage(seed) {
+
+    const deadline = parseSeedDeadline(seed.deadline);
+
+    // Seed yang edisinya sudah tutup tidak perlu di-fetch lagi.
+
+    if (deadline && new Date(deadline).getTime() < Date.now()) {
+        return null;
+    }
 
     if (seed.skipFetch) {
         return null;
@@ -91,7 +139,9 @@ async function fetchSeedPage(seed) {
             fee: "",
             location: "Indonesia",
             period: "",
+            deadline,
             pageText,
+            content: pageText.substring(0, 4000),
             source: "Resmi"
         };
 
@@ -130,5 +180,6 @@ async function getSeedCompetitions() {
 
 module.exports = {
     getSeedCompetitions,
+    parseSeedDeadline,
     SEED_COMPETITIONS
 };

@@ -38,6 +38,10 @@ const { isAlreadyPosted } =
 
 const MAX_POSTS_PER_CYCLE = 10;
 
+// Lomba global (Devpost/CTFtime) dibatasi supaya tidak menenggelamkan
+// lomba Indonesia di channel.
+const MAX_GLOBAL_POSTS_PER_CYCLE = 2;
+
 // Postingan sumber yang lebih tua dari ini dan tanpa deadline dianggap basi.
 const STALE_POST_DAYS = 30;
 
@@ -55,6 +59,9 @@ function isStalePost(publishedDate) {
 // Lomba AI-enriched mendapat prioritas ekstra di urutan posting.
 
 const AI_BONUS_SCORE = 1;
+
+// Lomba global selalu diurutkan setelah lomba Indonesia.
+const GLOBAL_PENALTY_SCORE = 10;
 
 
 let isCheckingCompetitions = false;
@@ -303,10 +310,12 @@ async function checkCompetitions(client) {
         enriched.sort((a, b) => {
 
             const scoreA = getMahasiswaScore(a) +
-                (a.aiEnriched ? AI_BONUS_SCORE : 0);
+                (a.aiEnriched ? AI_BONUS_SCORE : 0) -
+                (a.global ? GLOBAL_PENALTY_SCORE : 0);
 
             const scoreB = getMahasiswaScore(b) +
-                (b.aiEnriched ? AI_BONUS_SCORE : 0);
+                (b.aiEnriched ? AI_BONUS_SCORE : 0) -
+                (b.global ? GLOBAL_PENALTY_SCORE : 0);
 
             return scoreB - scoreA;
         });
@@ -317,8 +326,15 @@ async function checkCompetitions(client) {
         );
 
         let postedCount = 0;
+        let globalPostedCount = 0;
 
         for (const competition of enriched) {
+
+            if (competition.global &&
+                globalPostedCount >= MAX_GLOBAL_POSTS_PER_CYCLE) {
+
+                continue;
+            }
 
             if (postedCount >= MAX_POSTS_PER_CYCLE) {
 
@@ -338,7 +354,12 @@ async function checkCompetitions(client) {
                 );
 
                 if (posted) {
+
                     postedCount++;
+
+                    if (competition.global) {
+                        globalPostedCount++;
+                    }
                 }
 
             } catch (error) {

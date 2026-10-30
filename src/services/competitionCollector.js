@@ -8,6 +8,8 @@
 const { getInfoLombaCompetitions } = require("../sources/infolombaId");
 const { getInfoLombaItCompetitions } = require("../sources/infolombaIt");
 const { getSeedCompetitions } = require("../sources/competitionSeed");
+const { getDevpostCompetitions } = require("../sources/devpost");
+const { getCtftimeCompetitions } = require("../sources/ctftime");
 
 // Jumlah kegagalan berturut-turut per sumber sebelum
 // dianggap rusak dan memicu alert.
@@ -19,10 +21,19 @@ const FAILURE_THRESHOLD = 3;
 const failureCounts = {
     InfoLomba: 0,
     InfoLombaIT: 0,
-    Resmi: 0
+    Devpost: 0
 };
 
+// Sumber yang kosong adalah kondisi normal (seed yang edisinya sudah
+// tutup, jadwal CTF kosong) — tidak dihitung sebagai kegagalan.
+
+const QUIET_SOURCES = new Set(["Resmi", "CTFtime"]);
+
 function recordSourceResult(source, itemCount) {
+
+    if (QUIET_SOURCES.has(source)) {
+        return false;
+    }
 
     const previous = failureCounts[source] ?? 0;
 
@@ -58,7 +69,9 @@ async function getCompetitions() {
     const sources = [
         ["InfoLomba", getInfoLombaCompetitions],
         ["InfoLombaIT", getInfoLombaItCompetitions],
-        ["Resmi", getSeedCompetitions]
+        ["Resmi", getSeedCompetitions],
+        ["Devpost", getDevpostCompetitions],
+        ["CTFtime", getCtftimeCompetitions]
     ];
 
     const results = await Promise.allSettled(

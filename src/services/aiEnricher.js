@@ -382,7 +382,11 @@ function enrichRuleBased(competition) {
         competition.snippet ||
         "";
 
+    // Sumber terstruktur (Devpost, CTFtime) sudah menyediakan
+    // deadline ISO — tidak perlu ditebak dari teks.
+
     const deadline =
+        competition.deadline ||
         extractDeadlineFromText(
             [
                 competition.period,
@@ -519,7 +523,7 @@ async function enrichWithAi(competition) {
 
         if (
             data.is_tech === false ||
-            data.is_indonesia === false
+            (data.is_indonesia === false && !competition.global)
         ) {
             return { rejected: true };
         }
@@ -527,9 +531,9 @@ async function enrichWithAi(competition) {
         // Normalisasi deadline AI ke ISO (bisa "2026-10-15"
         // atau teks Indonesia).
 
-        let deadline = data.deadline || "";
+        let deadline = competition.deadline || data.deadline || "";
 
-        if (deadline) {
+        if (deadline && !competition.deadline) {
 
             const parsed = new Date(deadline);
 

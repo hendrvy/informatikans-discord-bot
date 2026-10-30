@@ -21,7 +21,8 @@ Bot Discord komunitas Informatikans. Awalnya ada dua bot terpisah (bot utilitas/
 
 ### 🏆 Lomba IT (AI Competition Finder)
 
-- Mengambil lomba IT Indonesia dari **InfoLomba.id** (kategori IT), **InfoLombaIT.com** (feed Blogger), dan situs resmi penyelenggara (FindIT! UGM; GEMASTIK SPA — dijadikan seed manual).
+- Mengambil lomba IT Indonesia dari **InfoLomba.id** (11 kategori teknologi), **InfoLombaIT.com** (feed Blogger), dan situs resmi penyelenggara (FindIT! UGM, Hology UB, GEMASTIK — seed manual dengan deadline yang diisi tangan di `competitionSeed.js`).
+- Menambah hackathon online global dari **Devpost** dan CTF online dari **CTFtime** (maks 2 posting global per siklus, diurutkan setelah lomba Indonesia).
 - **AI hybrid**: lomba difilter rule-based dulu (hemat kuota), lalu diperkaya **Google Gemini** (`gemini-2.0-flash`) untuk ekstraksi terstruktur — kategori, deadline pendaftaran, biaya, target peserta, deskripsi, link pendaftaran langsung, plus verifikasi `is_tech`/`is_indonesia`. Jika API key kosong, kuota habis (429/403), atau request gagal → **fallback penuh ke ekstraksi rule-based** (regex tanggal Indonesia, link pendaftaran, kategori).
 - Anti-duplikat 3 lapis: dedup antar-sumber dalam satu batch (Set link), link ternormalisasi (query/hash/trailing slash dibuang), dan judul ternormalisasi (tahun & tanda baca dibuang) — disimpan di SQLite `posted_competitions` (masa simpan 180 hari).
 - Prioritas mahasiswa: lomba dengan target mahasiswa diposting lebih dulu (skor `getMahasiswaScore`), maksimum 10 posting per siklus.
@@ -168,7 +169,7 @@ Dibatasi khusus member dengan permission **Administrator** untuk mencegah penyal
    | `EVENT_ANNOUNCE_CHANNEL_ID` | Channel untuk announce event & reminder (default: sama dengan `CHANNEL_ID`). |
    | `SUGGESTION_CHANNEL_ID` | (Opsional) Channel tujuan saran dari `/saran` (default: channel komunitas khusus). |
    | `ADMIN_USER_ID` | (Opsional) User ID Discord yang menerima DM alert kritikal (scraper rusak). |
-   | `LOMBA_CHANNEL_ID` | Channel tujuan posting lomba IT (default: sama dengan `CHANNEL_ID`). |
+   | `LOMBA_CHANNEL_ID` | Channel tujuan posting lomba IT. Isi dengan channel yang berbeda dari `CHANNEL_ID` (magang) agar terpisah; jika kosong, lomba ikut diposting di `CHANNEL_ID`. |
    | `GEMINI_API_KEY` | (Opsional) API key Google Gemini untuk ekstraksi AI lomba. Kosong = fallback rule-based murni. |
    | `LOMBA_MAX_AI_CALLS` | Maksimum panggilan AI per siklus, default 25 (hemat kuota free tier). |
    | `LOMBA_ENABLED` | Kill switch fitur lomba, default `true`. Set `false` untuk mematikan. |
@@ -245,7 +246,9 @@ src/
 │   ├── jooble.js                     # Integrasi Jooble API
 │   ├── devjobsindo.js                # Scraping DevJobsIndo
 │   ├── kalibrr.js                    # Scraping Kalibrr
-│   ├── infolombaId.js                # Scraping infolomba.id (kategori IT)
+│   ├── infolombaId.js                # Scraping infolomba.id (multi-kategori)
+│   ├── devpost.js                    # API hackathon Devpost (global, online)
+│   ├── ctftime.js                    # API CTFtime (CTF online global)
 │   ├── infolombaIt.js                # Feed Blogger infolombait.com
 │   └── competitionSeed.js            # Situs resmi penyelenggara (seed)
 ├── utils/

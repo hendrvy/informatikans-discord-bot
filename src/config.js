@@ -26,6 +26,18 @@ for (const key of required) {
 }
 
 
+if (
+    process.env.LOMBA_ENABLED !== "false" &&
+    !process.env.LOMBA_CHANNEL_ID
+) {
+
+    console.warn(
+        "⚠️ LOMBA_CHANNEL_ID belum diisi — lomba akan diposting " +
+        "di channel yang sama dengan lowongan magang (CHANNEL_ID)."
+    );
+}
+
+
 // ==============================
 // PARSE DAFTAR CHANNEL ID (dipisah koma)
 // ==============================
